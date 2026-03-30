@@ -1,0 +1,150 @@
+http://localhost:5173/
+
+Building a Design System Foundation (React + Tailwind v4)
+
+I started building a design system from scratch in a React + Vite environment, using Tailwind v4 and a token-driven approach.
+
+The goal wasn’t to “style components”, but to set up a system where decisions (color, spacing, interaction) are encoded and reusable.
+
+1. Set up a working environment
+Created a Vite + React + TypeScript project
+Integrated Tailwind v4 using the Vite plugin (not PostCSS)
+Fixed multiple setup issues:
+broken imports
+incorrect folder structure
+Tailwind not generating utilities
+dev server not running
+
+Value:
+I now understand the actual mechanics behind Tailwind v4 (theme generation, build pipeline), not just how to use classes.
+
+2. Defined semantic tokens (not raw values)
+
+Built a token system using @theme:
+
+Color system:
+surfaces (page, surface, hover, selected)
+text (default, muted, inverse, brand)
+actions (primary, secondary, ghost)
+feedback (danger, success, warning)
+Spacing scale (rem-based, 4px system)
+Semantic spacing (inline, stack, section)
+Radius, shadows, control heights, typography
+
+Focused on:
+
+accessibility (contrast)
+ERP constraints (density, readability)
+mapping a personal visual language (warm palette) into a product-safe system
+
+Value:
+I can translate a visual style into a scalable, semantic token system instead of hardcoding UI.
+
+3. Connected tokens to Tailwind semantic utilities
+Switched from :root tokens to Tailwind v4 @theme
+Enabled semantic classes like:
+bg-primary
+text-on-primary
+border-secondary-border
+Debugged why utilities weren’t generating
+Cleaned global CSS conflicts that were overriding everything
+
+Value:
+I understand how to bridge design tokens → utility classes → real UI, and how to debug when that chain breaks.
+
+4. Built a Button as a system primitive
+
+Created a reusable Button component with:
+
+Variants: primary, secondary, ghost
+Sizes: sm, md
+States:
+hover
+active
+focus-visible
+disabled
+
+Structured the component with clear layers:
+
+base (layout + behavior)
+variant (meaning / hierarchy)
+size (density)
+final composition
+
+Key decisions:
+
+Primary = surface-driven (filled)
+Secondary = structure-driven (border, no fill)
+Ghost = text-driven (no structure)
+
+Refined interaction model:
+
+removed background hover for secondary
+used border + subtle background for feedback
+aligned hover behavior between secondary and ghost
+
+Value:
+I’m not just implementing buttons — I’m defining interaction rules and hierarchy that scale across a product.
+
+5. Tuned visual hierarchy and interaction
+
+Iterated on:
+
+secondary button border:
+moved from brand-colored → structural → hybrid (subtle brand on hover)
+hover behavior:
+shifted from color-heavy → structure-driven interaction
+disabled states:
+ensured readability, not just opacity
+balance between brand and neutrality
+
+Value:
+I can make trade-offs between brand expression and system clarity, especially in enterprise contexts.
+
+6. Introduced system-driven spacing
+Defined spacing tokens (base + semantic)
+Tried semantic spacing (--space-actions-md)
+Hit Tailwind limitations with arbitrary values
+Adjusted to use base tokens (--space-3) pragmatically
+
+Value:
+I understand when to push system purity vs when to simplify to keep momentum. I don’t over-engineer too early.
+
+7. Built a playground to validate the system
+
+Created a small UI to test:
+
+variants
+sizes
+disabled states
+spacing consistency
+
+Used it to:
+
+detect broken tokens
+debug Tailwind issues
+visually validate hierarchy decisions
+
+Value:
+I validate systems through usage, not just definitions. I build environments to test decisions early.
+
+What this shows
+What I brought to this project
+Structured thinking (tokens → components → usage)
+Ability to debug tooling, not just design
+Clear hierarchy and interaction modeling
+Translating visual style into system constraints
+Iterating based on behavior, not aesthetics
+What I learned
+How Tailwind v4 actually generates semantic utilities
+How fragile the token → utility → component chain can be
+How small decisions (border color, hover behavior) affect system clarity
+Where to stop refining and move to the next component
+How to balance system rigor with speed
+What I can bring to another team
+Build or clean up a design system from messy or incomplete foundations
+Define semantic tokens that actually scale across a product
+Create components that encode interaction patterns, not just visuals
+Align design and engineering through shared primitives (tokens + code)
+Work comfortably in code (React, Tailwind) to prototype and validate ideas
+Make pragmatic decisions instead of over-engineering early systems
