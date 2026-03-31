@@ -11,9 +11,9 @@
   --color-warning-hover: var(--color-amber-700);
   --color-on-warning: var(--color-warm-25);
 
-  --color-info: var(--color-brown-500);
-  --color-info-hover: var(--color-brown-700);
-  --color-on-info: var(--color-warm-25);
+  --color-info: var(--color-blue-500);
+  --color-info-hover: var(--color-blue-700);
+  --color-on-info: var(--color-warm-0);
 
   --color-disabled-bg: var(--color-warm-350);
   --color-disabled-text: var(--color-warm-800);
