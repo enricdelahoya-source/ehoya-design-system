@@ -7,8 +7,8 @@
   --color-success-hover: var(--color-green-700);
   --color-on-success: var(--color-warm-0);
 
-  --color-warning: var(--color-amber-500);
-  --color-warning-hover: var(--color-amber-700);
+  --color-warning: color-mix(in srgb, var(--color-amber-500) 78%, var(--color-orange-550));
+  --color-warning-hover: color-mix(in srgb, var(--color-amber-700) 82%, var(--color-orange-700));
   --color-on-warning: var(--color-warm-25);
 
   --color-info: var(--color-blue-500);

@@ -1,4 +1,5 @@
 import type { ReactNode } from "react"
+import BrandStripe from "./BrandStripe"
 import Link from "./Link"
 import StatusBadge from "./StatusBadge"
 
@@ -54,12 +55,15 @@ export default function RecordShellBar({
    */
   const container = [
     "flex",
+    "flex-col",
+    "gap-[var(--space-2)]",
+  ].join(" ")
+
+  const contentRow = [
+    "flex",
     "items-center",
     "justify-between",
     "gap-[var(--space-stack-md)]",
-    "border-b",
-    "border-[var(--color-border-divider)]",
-    "pb-[var(--space-stack-md)]",
   ].join(" ")
 
   const identity = [
@@ -116,34 +120,38 @@ export default function RecordShellBar({
    */
   return (
     <section className={container} aria-label={`${recordType} shell bar`}>
-      <div className={identity}>
-        <Link href="#" className={parentLinkClasses}>
-          {recordType}
-        </Link>
+      <div className={contentRow}>
+        <div className={identity}>
+          <Link href="#" className={parentLinkClasses}>
+            {recordType}
+          </Link>
 
-        <div className={titleRow}>
-          <h2 className={titleClasses}>{title}</h2>
+          <div className={titleRow}>
+            <h2 className={titleClasses}>{title}</h2>
 
-          {status ? (
-            <StatusBadge
-              tone={status.tone}
-              emphasis={status.emphasis}
-              size="md"
-              className="-translate-y-[1px] self-center"
-            >
-              {status.label}
-            </StatusBadge>
+            {status ? (
+              <StatusBadge
+                tone={status.tone}
+                emphasis={status.emphasis}
+                size="md"
+                className="-translate-y-[1px] self-center"
+              >
+                {status.label}
+              </StatusBadge>
+            ) : null}
+          </div>
+
+          {metadata ? (
+            <div className={metadataClasses}>{metadata}</div>
           ) : null}
         </div>
 
-        {metadata ? (
-          <div className={metadataClasses}>{metadata}</div>
+        {actions ? (
+          <div className={actionsClasses}>{actions}</div>
         ) : null}
       </div>
 
-      {actions ? (
-        <div className={actionsClasses}>{actions}</div>
-      ) : null}
+      <BrandStripe className="mt-[2px]" />
     </section>
   )
 }
