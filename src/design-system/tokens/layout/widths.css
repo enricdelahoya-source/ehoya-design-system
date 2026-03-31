@@ -1,0 +1,5 @@
+@theme {
+  --content-width-sm: var(--size-content-width-sm);
+  --content-width-md: var(--size-content-width-md);
+  --content-width-lg: var(--size-content-width-lg);
+}

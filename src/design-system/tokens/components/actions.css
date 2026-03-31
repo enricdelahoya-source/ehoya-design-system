@@ -1,0 +1,17 @@
+@theme {
+  --color-primary: var(--color-action-brand);
+  --color-primary-hover: var(--color-action-brand-hover);
+  --color-primary-active: var(--color-action-brand-active);
+  --color-on-primary: var(--color-on-action-brand);
+
+  --color-secondary: var(--color-action-secondary-surface);
+  --color-secondary-hover: var(--color-action-secondary-hover);
+  --color-secondary-active: var(--color-action-secondary-active);
+  --color-on-secondary: var(--color-on-action-secondary);
+  --color-secondary-border: var(--color-action-secondary-border);
+  --color-secondary-border-hover: var(--color-action-secondary-border-hover);
+
+  --color-ghost-hover: var(--color-action-ghost-hover);
+  --color-ghost-active: var(--color-action-ghost-active);
+  --color-on-ghost: var(--color-on-action-ghost);
+}

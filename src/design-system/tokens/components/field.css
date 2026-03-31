@@ -1,0 +1,16 @@
+@theme {
+  --color-field-bg: var(--color-surface-elevated);
+  --color-field-hover: var(--color-warm-125);
+  --color-field-border: var(--color-border-field);
+  --color-field-border-hover: var(--color-border-field-hover);
+  --color-field-border-focus: var(--color-border-focus);
+  --color-field-text: var(--color-text-default);
+  --color-field-placeholder: var(--color-text-subtle);
+  --color-field-readonly-bg: var(--color-surface);
+  --color-field-readonly-border: var(--color-border-subtle);
+  --color-field-readonly-text: var(--color-text-default);
+
+  --color-field-error-bg: var(--color-surface-danger-subtle);
+  --color-field-error-border: var(--color-danger);
+  --color-field-error-text: var(--color-text-danger);
+}

@@ -1,0 +1,26 @@
+@import "./foundations/colors.css";
+@import "./foundations/typography.css";
+@import "./foundations/spacing.css";
+@import "./foundations/radius.css";
+@import "./foundations/sizing.css";
+@import "./foundations/shadows.css";
+
+@import "./semantics/surfaces.css";
+@import "./semantics/text.css";
+@import "./semantics/borders.css";
+@import "./semantics/states.css";
+
+@import "./components/actions.css";
+@import "./components/field.css";
+@import "./components/table.css";
+
+@import "./layout/spacing.css";
+@import "./layout/widths.css";
+
+@utility gap-actions-sm {
+  gap: var(--space-actions-sm);
+}
+
+@utility gap-actions-md {
+  gap: var(--space-actions-md);
+}

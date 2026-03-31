@@ -1,0 +1,6 @@
+@theme {
+  --color-row-hover: var(--color-warm-200);
+  --color-row-selected: var(--color-surface-selected);
+  --color-row-selected-hover: var(--color-warm-375);
+  --color-row-striped: var(--color-warm-75);
+}

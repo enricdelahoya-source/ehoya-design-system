@@ -1,0 +1,54 @@
+@theme {
+  /* Warm neutrals */
+  --color-warm-0: #fffdf9;
+  --color-warm-25: #fffaf5;
+  --color-warm-50: #fcfaf6;
+  --color-warm-75: #f8f5f0;
+  --color-warm-100: #f6f3ed;
+  --color-warm-125: #f6f1e9;
+  --color-warm-150: #f2f0eb;
+  --color-warm-175: #f2ece4;
+  --color-warm-200: #f0e9df;
+  --color-warm-225: #efe9df;
+  --color-warm-250: #efe2d8;
+  --color-warm-275: #ece4d9;
+  --color-warm-300: #e9e2d7;
+  --color-warm-325: #e9e0d5;
+  --color-warm-350: #e8e1d7;
+  --color-warm-375: #e8d7cb;
+  --color-warm-400: #e4dacc;
+  --color-warm-450: #ddd3c7;
+  --color-warm-500: #d5cabd;
+  --color-warm-550: #d3c7ba;
+  --color-warm-600: #cdbfae;
+  --color-warm-650: #c7b8a6;
+  --color-warm-700: #b9a893;
+  --color-warm-750: #b6a795;
+  --color-warm-800: #958b7f;
+  --color-warm-850: #847b70;
+  --color-warm-900: #5f584f;
+  --color-warm-950: #2a2622;
+
+  /* Brand and feedback */
+  --color-ink-900: #1f1b17;
+  --color-red-500: #b23a32;
+  --color-red-550: #a12621;
+  --color-red-600: #9f2f2a;
+  --color-red-700: #972f29;
+  --color-red-800: #8d211d;
+  --color-red-900: #781c18;
+  --color-orange-500: #d86414;
+  --color-orange-550: #c86a2a;
+  --color-orange-700: #bc5511;
+  --color-orange-800: #a94b0f;
+  --color-amber-500: #bf7a1f;
+  --color-amber-700: #a7681a;
+  --color-amber-800: #8b5718;
+  --color-green-500: #4d7961;
+  --color-green-700: #406652;
+  --color-green-800: #2e6a4f;
+  --color-brown-500: #7b5e3e;
+  --color-brown-700: #664d33;
+  --color-danger-surface: #fff6f4;
+  --color-focus-ring-soft: #a8846e;
+}

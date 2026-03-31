@@ -223,6 +223,9 @@
   --space-section-md: var(--space-8);
   --space-section-lg: var(--space-12);
 
+  --space-actions-sm: var(--space-2);
+  --space-actions-md: var(--space-3);
+
   /* ============================== */
   /* CONTROL HEIGHTS                */
   /* Shared component sizing        */

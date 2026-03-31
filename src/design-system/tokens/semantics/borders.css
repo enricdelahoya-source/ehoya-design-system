@@ -1,0 +1,14 @@
+@theme {
+  --color-border-subtle: var(--color-warm-500);
+  --color-border-strong: var(--color-warm-750);
+  --color-border-divider: var(--color-warm-450);
+  --color-border-focus: var(--color-orange-500);
+  --color-border-danger: var(--color-red-500);
+  --color-border-success: var(--color-green-500);
+  --color-border-warning: var(--color-amber-500);
+
+  --color-border-control: var(--color-warm-650);
+  --color-border-control-hover: var(--color-orange-550);
+  --color-border-field: var(--color-warm-600);
+  --color-border-field-hover: var(--color-warm-700);
+}

@@ -1,0 +1,9 @@
+@theme {
+  --color-page: var(--color-warm-150);
+  --color-surface: var(--color-warm-100);
+  --color-surface-hover: var(--color-warm-225);
+  --color-surface-muted: var(--color-warm-300);
+  --color-surface-elevated: var(--color-warm-50);
+  --color-surface-selected: var(--color-warm-250);
+  --color-surface-inverse: var(--color-warm-950);
+}

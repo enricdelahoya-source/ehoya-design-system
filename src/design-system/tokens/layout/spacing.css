@@ -1,0 +1,20 @@
+@theme {
+  --space-inline-sm: var(--space-2);
+  --space-inline-md: var(--space-3);
+  --space-inline-lg: var(--space-4);
+
+
+  --space-stack-2xs: var(--space-1);
+  --space-stack-xs: var(--space-2);
+  --space-stack-sm: var(--space-3);
+  --space-stack-md: var(--space-4);
+  --space-stack-lg: var(--space-6);
+  --space-stack-xl: var(--space-8);
+
+  --space-actions-sm: var(--space-2);
+  --space-actions-md: var(--space-3);
+
+  --space-section-sm: var(--space-6);
+  --space-section-md: var(--space-8);
+  --space-section-lg: var(--space-12);
+}

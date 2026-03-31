@@ -143,15 +143,15 @@ export default function Button({
     sm: [
       "h-[var(--control-height-sm)]",
       "px-[var(--space-inline-sm)]",
-      "text-[var(--text-sm)]",
-      "leading-[var(--leading-normal)]",
+      "text-sm",
+      "leading-normal",
     ].join(" "),
 
     md: [
       "h-[var(--control-height-md)]",
       "px-[var(--space-inline-md)]",
-      "text-[var(--text-sm)]",
-      "leading-[var(--leading-normal)]",
+      "text-sm",
+      "leading-normal",
     ].join(" "),
   }
 

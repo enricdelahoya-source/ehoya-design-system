@@ -1,14 +1,14 @@
 import { forwardRef } from "react"
-import type { InputHTMLAttributes } from "react"
+import type { TextareaHTMLAttributes } from "react"
 
 /**
  * ========================================
- * INPUT
- * Design-system input primitive
+ * TEXTAREA
+ * Design-system textarea primitive
  * ========================================
  *
- * This component wraps the native <input> element and focuses
- * only on control styling and native input behavior.
+ * This component wraps the native <textarea> element and focuses
+ * only on control styling and native textarea behavior.
  *
  * Shared field structure like labels, hints, and errors lives
  * in the Field wrapper component.
@@ -19,16 +19,16 @@ import type { InputHTMLAttributes } from "react"
  * 1. PUBLIC API
  * ========================================
  */
-type InputProps = {
+type TextareaProps = {
   size?: "sm" | "md"
-} & Omit<InputHTMLAttributes<HTMLInputElement>, "size">
+} & TextareaHTMLAttributes<HTMLTextAreaElement>
 
 /**
  * ========================================
  * 2. COMPONENT
  * ========================================
  */
-const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
+const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function Textarea(
   {
     size = "md",
     className = "",
@@ -43,7 +43,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
 
   /**
    * ========================================
-   * 3. BASE INPUT
+   * 3. BASE TEXTAREA
    * ========================================
    *
    * Keep this neutral.
@@ -55,6 +55,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
     "rounded-[var(--radius-sm)]",
     "border",
     "outline-none",
+    "resize-y",
     "transition-[border-color,box-shadow,background-color,color]",
     "bg-[var(--color-field-bg)]",
     "text-[var(--color-field-text)]",
@@ -95,47 +96,44 @@ const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
    *
    * Ring communicates interaction state.
    * Border thickness adds structural emphasis.
-   *
-   * Normal focus:
-   * - thicker neutral border
-   * - subtle warm ring
-   *
-   * Error focus:
-   * - keep red border
-   * - keep subtle warm ring
    */
   const focusClasses = isInvalid
-  ? [
-      "focus:border-2",
-      "focus:border-[var(--color-field-error-border)]",
-      "focus-visible:ring-1",
-      "focus-visible:ring-[var(--color-focus-ring)]",
-      "focus-visible:ring-offset-1",
-      "focus-visible:ring-offset-[var(--color-focus-ring-offset)]",
-    ].join(" ")
-  : [
-      "focus:border-2",
-      "focus:border-[var(--color-field-border-focus)]",
-      "focus-visible:ring-1",
-      "focus-visible:ring-[var(--color-focus-ring)]",
-      "focus-visible:ring-offset-1",
-      "focus-visible:ring-offset-[var(--color-focus-ring-offset)]",
-    ].join(" ")
+    ? [
+        "focus:border-2",
+        "focus:border-[var(--color-field-error-border)]",
+        "focus-visible:ring-1",
+        "focus-visible:ring-[var(--color-focus-ring)]",
+        "focus-visible:ring-offset-1",
+        "focus-visible:ring-offset-[var(--color-focus-ring-offset)]",
+      ].join(" ")
+    : [
+        "focus:border-2",
+        "focus:border-[var(--color-field-border-focus)]",
+        "focus-visible:ring-1",
+        "focus-visible:ring-[var(--color-focus-ring)]",
+        "focus-visible:ring-offset-1",
+        "focus-visible:ring-offset-[var(--color-focus-ring-offset)]",
+      ].join(" ")
+
   /**
    * ========================================
    * 6. SIZE
    * ========================================
+   *
+   * Textareas use padding + min-height instead of fixed height.
    */
   const sizes = {
     sm: [
-      "h-[var(--control-height-sm)]",
+      "min-h-[calc(var(--control-height-sm)*3)]",
       "px-[var(--space-inline-sm)]",
+      "py-[var(--space-2)]",
       "text-sm",
       "leading-normal",
     ].join(" "),
     md: [
-      "h-[var(--control-height-md)]",
+      "min-h-[calc(var(--control-height-md)*3)]",
       "px-[var(--space-inline-md)]",
+      "py-[var(--space-3)]",
       "text-sm",
       "leading-normal",
     ].join(" "),
@@ -146,7 +144,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
    * 7. FINAL COMPOSITION
    * ========================================
    */
-  const inputClasses = [base, stateClasses, focusClasses, sizes[size], className]
+  const textareaClasses = [base, stateClasses, focusClasses, sizes[size], className]
     .filter(Boolean)
     .join(" ")
 
@@ -156,9 +154,9 @@ const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
    * ========================================
    */
   return (
-    <input
+    <textarea
       ref={ref}
-      className={inputClasses}
+      className={textareaClasses}
       disabled={disabled}
       aria-invalid={ariaInvalid}
       {...props}
@@ -166,4 +164,4 @@ const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
   )
 })
 
-export default Input
+export default Textarea

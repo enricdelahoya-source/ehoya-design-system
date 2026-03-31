@@ -1,0 +1,10 @@
+@theme {
+  --control-height-xs: 1.75rem;
+  --control-height-sm: 2rem;
+  --control-height-md: 2.5rem;
+  --control-height-lg: 2.75rem;
+
+  --size-content-width-sm: 30rem;
+  --size-content-width-md: 42rem;
+  --size-content-width-lg: 64rem;
+}

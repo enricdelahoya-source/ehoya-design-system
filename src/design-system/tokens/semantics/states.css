@@ -1,0 +1,47 @@
+@theme {
+  --color-danger: var(--color-red-500);
+  --color-danger-hover: var(--color-red-700);
+  --color-on-danger: var(--color-warm-25);
+
+  --color-success: var(--color-green-500);
+  --color-success-hover: var(--color-green-700);
+  --color-on-success: var(--color-warm-0);
+
+  --color-warning: var(--color-amber-500);
+  --color-warning-hover: var(--color-amber-700);
+  --color-on-warning: var(--color-warm-25);
+
+  --color-info: var(--color-brown-500);
+  --color-info-hover: var(--color-brown-700);
+  --color-on-info: var(--color-warm-25);
+
+  --color-disabled-bg: var(--color-warm-350);
+  --color-disabled-text: var(--color-warm-800);
+  --color-disabled-border: var(--color-warm-550);
+
+  --color-surface-danger-subtle: var(--color-danger-surface);
+
+  --color-focus-ring: var(--color-focus-ring-soft);
+  --color-focus-ring-offset: var(--color-page);
+
+  --color-action-brand: var(--color-red-550);
+  --color-action-brand-hover: var(--color-red-800);
+  --color-action-brand-active: var(--color-red-900);
+  --color-on-action-brand: var(--color-warm-25);
+
+  --color-action-secondary-surface: var(--color-surface-elevated);
+  --color-action-secondary-hover: var(--color-warm-175);
+  --color-action-secondary-active: var(--color-warm-325);
+  --color-action-secondary-border: var(--color-border-control);
+  --color-action-secondary-border-hover: var(--color-border-control-hover);
+  --color-on-action-secondary: var(--color-text-brand);
+
+  --color-action-ghost-hover: var(--color-warm-275);
+  --color-action-ghost-active: var(--color-warm-400);
+  --color-on-action-ghost: var(--color-text-brand);
+
+  --color-accent: var(--color-orange-500);
+  --color-accent-hover: var(--color-orange-700);
+  --color-accent-active: var(--color-orange-800);
+  --color-on-accent: var(--color-warm-25);
+}
