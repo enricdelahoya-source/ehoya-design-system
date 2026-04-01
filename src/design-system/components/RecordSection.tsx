@@ -16,17 +16,20 @@ export default function RecordSection({
   const titleId = useId()
 
   const sectionClasses = [
-    "space-y-[var(--space-stack-sm)]",
-    "border-b",
-    "border-[var(--color-border-divider)]",
     "px-[var(--space-section-sm)]",
     "pt-[var(--space-5)]",
-    "pb-[var(--space-5)]",
     "md:px-[var(--space-section-md)]",
     className,
   ]
     .filter(Boolean)
     .join(" ")
+
+  const innerClasses = [
+    "space-y-[var(--space-stack-sm)]",
+    "border-b",
+    "border-[var(--color-border-divider)]",
+    "pb-[var(--space-5)]",
+  ].join(" ")
 
   const headerClasses = [
     "space-y-[var(--space-2)]",
@@ -55,17 +58,19 @@ export default function RecordSection({
 
   return (
     <section aria-labelledby={titleId} className={sectionClasses}>
-      <div className={headerClasses}>
-        <h2 id={titleId} className={titleClasses} style={titleStyles}>
-          {title}
-        </h2>
+      <div className={innerClasses}>
+        <div className={headerClasses}>
+          <h2 id={titleId} className={titleClasses} style={titleStyles}>
+            {title}
+          </h2>
 
-        {description ? (
-          <p className={descriptionClasses}>{description}</p>
-        ) : null}
+          {description ? (
+            <p className={descriptionClasses}>{description}</p>
+          ) : null}
+        </div>
+
+        <div className={contentClasses}>{children}</div>
       </div>
-
-      <div className={contentClasses}>{children}</div>
     </section>
   )
 }

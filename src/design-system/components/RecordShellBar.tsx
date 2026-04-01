@@ -27,9 +27,11 @@ type RecordShellBarBreadcrumb = {
 type RecordShellBarProps = {
   breadcrumbs?: RecordShellBarBreadcrumb[]
   title: string
+  mode?: "view" | "edit"
   recordId?: string
   status?: CaseStatus
   metadata?: ReactNode
+  isDirty?: boolean
   actions?: ReactNode
 }
 
@@ -41,9 +43,11 @@ type RecordShellBarProps = {
 export default function RecordShellBar({
   breadcrumbs,
   title,
+  mode = "view",
   recordId,
   status,
   metadata,
+  isDirty = false,
   actions,
 }: RecordShellBarProps) {
   /**
@@ -56,7 +60,9 @@ export default function RecordShellBar({
    * identifier between title and metadata.
    */
   const container = [
-    "bg-[var(--color-surface-shell)]",
+    mode === "edit"
+      ? "bg-[color-mix(in_srgb,var(--color-accent)_4%,var(--color-surface-shell))]"
+      : "bg-[var(--color-surface-shell)]",
     "mb-[var(--space-8)]",
   ].join(" ")
 
@@ -152,12 +158,39 @@ export default function RecordShellBar({
     "text-[color:var(--color-text-secondary)]",
   ].join(" ")
 
+  const titleBadgeClasses = [
+    "inline-flex",
+    "shrink-0",
+    "self-center",
+  ].join(" ")
+
   const actionsClasses = [
     "flex",
-    "shrink-0",
     "items-center",
     "gap-actions-md",
-    "self-start",
+  ].join(" ")
+
+  const dirtyIndicatorClasses = [
+    "text-xs",
+    "leading-[var(--leading-normal)]",
+    "font-normal",
+    "text-[color:var(--color-text-muted)]",
+    "whitespace-nowrap",
+  ].join(" ")
+
+  const showBreadcrumbs = mode === "view" && Boolean(breadcrumbs?.length)
+  const showStatus = mode === "view" && Boolean(status)
+  const showMetadata = mode === "view" && Boolean(metadata)
+  const showIdentityMeta = Boolean(recordId) || showMetadata
+  const showDirtyIndicator = mode === "edit" && isDirty
+  const showActionsArea = Boolean(actions) || showDirtyIndicator
+
+  const actionsAreaClasses = [
+    "flex",
+    "shrink-0",
+    showDirtyIndicator
+      ? "self-stretch flex-col items-end justify-between gap-[var(--space-1)]"
+      : "self-start items-center gap-[var(--space-3)]",
   ].join(" ")
 
   /**
@@ -168,7 +201,7 @@ export default function RecordShellBar({
   return (
     <section className={container} aria-label="Record shell bar">
       <div className={inner}>
-        {breadcrumbs?.length ? (
+        {showBreadcrumbs && breadcrumbs ? (
           <nav aria-label="Breadcrumb" className={breadcrumbRow}>
             {breadcrumbs.map((breadcrumb, index) => (
               <span key={breadcrumb.href} className="inline-flex items-center gap-[var(--space-2)]">
@@ -192,37 +225,46 @@ export default function RecordShellBar({
                 {title}
               </h1>
 
-              {status ? (
-                <CaseStatusBadge
-                  status={status}
-                  emphasis="subtle"
-                  size="md"
-                  className="-translate-y-[3px] self-center"
-                />
+              {showStatus && status ? (
+                <span className={titleBadgeClasses} style={{ transform: "translateY(3px)" }}>
+                  <CaseStatusBadge
+                    status={status}
+                    emphasis="subtle"
+                    size="md"
+                  />
+                </span>
               ) : null}
             </div>
 
-            {recordId || metadata ? (
+            {showIdentityMeta ? (
               <div className={identityMetaRow}>
                 {recordId ? (
                   <div className={recordIdClasses}>{recordId}</div>
                 ) : null}
 
-                {recordId && metadata ? (
+                {recordId && showMetadata ? (
                   <span aria-hidden="true" className={metadataClasses}>
                     •
                   </span>
                 ) : null}
 
-                {metadata ? (
+                {showMetadata ? (
                   <div className={metadataClasses}>{metadata}</div>
                 ) : null}
               </div>
             ) : null}
           </div>
 
-          {actions ? (
-            <div className={actionsClasses}>{actions}</div>
+          {showActionsArea ? (
+            <div className={actionsAreaClasses}>
+              {actions ? (
+                <div className={actionsClasses}>{actions}</div>
+              ) : null}
+
+              {showDirtyIndicator ? (
+                <div className={dirtyIndicatorClasses}>Unsaved changes</div>
+              ) : null}
+            </div>
           ) : null}
         </div>
       </div>

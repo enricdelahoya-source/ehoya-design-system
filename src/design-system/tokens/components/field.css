@@ -11,6 +11,6 @@
   --color-field-readonly-text: var(--color-text-default);
 
   --color-field-error-bg: var(--color-surface-danger-subtle);
-  --color-field-error-border: var(--color-danger);
-  --color-field-error-text: var(--color-text-danger);
+  --color-field-error-border: var(--color-red-600);
+  --color-field-error-text: var(--color-red-700);
 }

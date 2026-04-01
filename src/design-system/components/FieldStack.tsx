@@ -10,7 +10,7 @@ export default function FieldStack({
   const fieldStackClasses = [
     "flex",
     "flex-col",
-    "gap-[var(--space-stack-md)]",
+    "gap-[var(--space-2)]",
     className,
   ]
     .filter(Boolean)

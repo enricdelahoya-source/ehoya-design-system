@@ -42,6 +42,7 @@ type FieldProps = {
   error?: string
   required?: boolean
   variant?: "default" | "tight"
+  layout?: "vertical" | "horizontal"
   children: ReactElement<FieldControlProps>
 }
 
@@ -56,6 +57,7 @@ export default function Field({
   error,
   required,
   variant = "default",
+  layout = "vertical",
   children,
 }: FieldProps) {
   const generatedId = useId()
@@ -100,15 +102,21 @@ export default function Field({
    * ========================================
    */
   const wrapper = [
-    "flex min-w-0 flex-col",
-    variant === "tight"
-      ? "gap-[var(--space-1)]"
-      : "gap-[var(--space-stack-xs)]",
+    "flex min-w-0",
+    layout === "horizontal"
+      ? "items-start gap-[var(--space-stack-sm)]"
+      : "flex-col",
+    layout === "vertical"
+      ? variant === "tight"
+        ? "gap-[var(--space-half)]"
+        : "gap-[var(--space-1)]"
+      : "",
   ].join(" ")
 
   const controlStack = [
     "flex min-w-0 flex-col",
-    "gap-[var(--space-stack-xs)]",
+    "gap-[var(--space-0)]",
+    layout === "horizontal" ? "flex-1" : "",
   ].join(" ")
 
   /**
@@ -118,6 +126,9 @@ export default function Field({
    * ========================================
    */
   const labelClasses = [
+    layout === "horizontal"
+      ? "w-[var(--field-label-width-horizontal)] shrink-0 pt-[calc((var(--control-height-md)-1lh)/2)]"
+      : "",
     "text-[length:var(--text-field-label)]",
     "leading-[var(--leading-normal)]",
     "font-normal",
@@ -133,12 +144,14 @@ export default function Field({
    * ========================================
    */
   const hintClasses = [
+    "pt-[var(--space-2)]",
     "text-[length:var(--text-meta)]",
     "leading-[var(--leading-normal)]",
     "text-[color:var(--color-text-muted)]",
   ].join(" ")
 
   const errorClasses = [
+    "pt-[var(--space-2)]",
     "text-xs",
     "leading-normal",
     "text-[var(--color-field-error-text)]",

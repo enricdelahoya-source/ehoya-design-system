@@ -56,6 +56,7 @@ const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select(
     "appearance-none",
     "rounded-[var(--radius-sm)]",
     "border",
+    "py-0",
     "outline-none",
     "bg-[var(--color-field-bg)]",
     "text-[var(--color-field-text)]",
@@ -98,33 +99,24 @@ const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select(
    * 5. FOCUS STATE
    * ========================================
    *
-   * Ring communicates interaction state.
-   * Border thickness adds structural emphasis.
+   * Border thickness communicates interaction state.
    *
    * Normal focus:
    * - thicker neutral border
-   * - subtle warm ring
+   * - no outer ring
    *
    * Error focus:
    * - keep red border
-   * - keep subtle warm ring
+   * - no outer ring
    */
   const focusClasses = isInvalid
   ? [
       "focus:border-2",
       "focus:border-[var(--color-field-error-border)]",
-      "focus-visible:ring-1",
-      "focus-visible:ring-[var(--color-focus-ring)]",
-      "focus-visible:ring-offset-0",
-      "focus-visible:ring-offset-[var(--color-focus-ring-offset)]",
     ].join(" ")
   : [
       "focus:border-2",
       "focus:border-[var(--color-field-border-focus)]",
-      "focus-visible:ring-1",
-      "focus-visible:ring-[var(--color-focus-ring)]",
-      "focus-visible:ring-offset-0",
-      "focus-visible:ring-offset-[var(--color-focus-ring-offset)]",
     ].join(" ")
 
   /**

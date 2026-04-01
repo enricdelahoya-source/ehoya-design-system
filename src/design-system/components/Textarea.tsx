@@ -94,25 +94,16 @@ const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function Textare
    * 5. FOCUS STATE
    * ========================================
    *
-   * Ring communicates interaction state.
-   * Border thickness adds structural emphasis.
+   * Border thickness communicates interaction state.
    */
   const focusClasses = isInvalid
     ? [
         "focus:border-2",
         "focus:border-[var(--color-field-error-border)]",
-        "focus-visible:ring-1",
-        "focus-visible:ring-[var(--color-focus-ring)]",
-        "focus-visible:ring-offset-0",
-        "focus-visible:ring-offset-[var(--color-focus-ring-offset)]",
       ].join(" ")
     : [
         "focus:border-2",
         "focus:border-[var(--color-field-border-focus)]",
-        "focus-visible:ring-1",
-        "focus-visible:ring-[var(--color-focus-ring)]",
-        "focus-visible:ring-offset-0",
-        "focus-visible:ring-offset-[var(--color-focus-ring-offset)]",
       ].join(" ")
 
   /**
@@ -124,16 +115,16 @@ const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function Textare
    */
   const sizes = {
     sm: [
-      "min-h-[calc(var(--control-height-sm)*3)]",
+      "min-h-[calc(var(--control-height-sm)*2.75)]",
       "px-[var(--space-inline-sm)]",
-      "py-[var(--space-2)]",
+      "py-[var(--space-1)]",
       "text-sm",
       "leading-normal",
     ].join(" "),
     md: [
-      "min-h-[calc(var(--control-height-md)*3)]",
+      "min-h-[calc(var(--control-height-md)*2.75)]",
       "px-[var(--space-inline-md)]",
-      "py-[var(--space-3)]",
+      "py-[var(--space-2)]",
       "text-sm",
       "leading-normal",
     ].join(" "),
