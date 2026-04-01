@@ -1,7 +1,7 @@
 # AGENTS.md
 
 ## Read first
-- Always read `SYSTEM_CONTRACT.md` before making changes
+- Always read `CONTRACT.md` before making changes
 - Follow its rules strictly
 
 ## Core rules

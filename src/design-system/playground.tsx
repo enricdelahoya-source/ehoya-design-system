@@ -1,5 +1,6 @@
 import { useState } from "react"
 import Button from "./components/Button"
+import CaseStatusBadge from "./components/CaseStatusBadge"
 import Field from "./components/Field"
 import Input from "./components/Input"
 import Link from "./components/Link"
@@ -80,7 +81,7 @@ export default function App() {
 
                 <div className="space-y-[var(--space-stack-xs)]">
                   <p className="text-xs font-medium uppercase tracking-[0.04em] text-text-muted">
-                    Subtle
+                    Primitive tones
                   </p>
                   <div className="flex flex-wrap items-center gap-actions-md">
                     <StatusBadge tone="info">New</StatusBadge>
@@ -88,52 +89,33 @@ export default function App() {
                     <StatusBadge tone="warning">Waiting on customer</StatusBadge>
                     <StatusBadge tone="danger">Escalated</StatusBadge>
                     <StatusBadge tone="success">Resolved</StatusBadge>
-                    <StatusBadge
-                      tone="neutral"
-                      className="bg-[color-mix(in_srgb,var(--color-surface-muted)_42%,var(--color-surface-elevated))] text-[var(--color-text-subtle)] border-[color-mix(in_srgb,var(--color-border-subtle)_55%,transparent)]"
-                    >
-                      Closed
-                    </StatusBadge>
+                    <StatusBadge tone="neutral">Closed</StatusBadge>
                   </div>
                 </div>
 
                 <div className="space-y-[var(--space-stack-xs)]">
                   <p className="text-xs font-medium uppercase tracking-[0.04em] text-text-muted">
-                    Strong
+                    Case statuses
                   </p>
                   <div className="flex flex-wrap items-center gap-actions-md">
-                    <StatusBadge tone="info" emphasis="strong">
-                      New
-                    </StatusBadge>
-                    <StatusBadge tone="warning" emphasis="strong">
-                      Waiting on customer
-                    </StatusBadge>
-                    <StatusBadge tone="danger" emphasis="strong">
-                      Escalated
-                    </StatusBadge>
-                    <StatusBadge tone="success" emphasis="strong">
-                      Resolved
-                    </StatusBadge>
+                    <CaseStatusBadge status="new" />
+                    <CaseStatusBadge status="in_progress" />
+                    <CaseStatusBadge status="waiting_on_customer" />
+                    <CaseStatusBadge status="escalated" />
+                    <CaseStatusBadge status="resolved" />
+                    <CaseStatusBadge status="closed" />
                   </div>
                 </div>
 
                 <div className="space-y-[var(--space-stack-xs)]">
                   <p className="text-xs font-medium uppercase tracking-[0.04em] text-text-muted">
-                    Sizes
+                    Case status sizes
                   </p>
                   <div className="flex flex-wrap items-center gap-actions-md">
-                    <StatusBadge tone="info" size="sm">
-                      In progress
-                    </StatusBadge>
-                    <StatusBadge tone="info" size="md">
-                      In progress
-                    </StatusBadge>
-                    <StatusBadge tone="success" emphasis="strong" size="sm">
-                      Resolved
-                    </StatusBadge>
-                    <StatusBadge tone="success" emphasis="strong" size="md">
-                      Resolved
-                    </StatusBadge>
+                    <CaseStatusBadge status="in_progress" size="sm" />
+                    <CaseStatusBadge status="in_progress" size="md" />
+                    <CaseStatusBadge status="resolved" size="sm" />
+                    <CaseStatusBadge status="resolved" size="md" />
                   </div>
                 </div>
               </section>
@@ -303,18 +285,15 @@ export default function App() {
               <div className="rounded-[var(--radius-md)] border border-dashed border-[var(--color-border-divider)] bg-[color-mix(in_srgb,var(--color-surface-elevated)_70%,transparent)]">
                 <div className="mx-auto max-w-[1200px] space-y-6 px-6 py-8">
                   <RecordShellBar
-                    recordType="Cases"
+                    breadcrumbs={[
+                      { label: "Service", href: "/service" },
+                      { label: "Cases", href: "/service/cases" },
+                    ]}
                     title="Payment failed after renewal"
-                    status={{
-                      label: "Waiting on customer",
-                      tone: "warning",
-                    }}
+                    recordId="CS-10842"
+                    status="waiting_on_customer"
                     metadata={
                       <>
-                        <span className="font-medium text-[var(--color-text-default)]">
-                          CS-10842
-                        </span>
-                        {" • "}
                         High priority
                         {" • "}
                         Owner: <Link href="#">Maria Chen</Link>

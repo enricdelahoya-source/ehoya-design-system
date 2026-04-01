@@ -3,11 +3,11 @@ import type { ReactNode } from "react"
 /**
  * ========================================
  * STATUS BADGE
- * Design-system status primitive
+ * Design-system semantic badge primitive
  * ========================================
  *
- * This component renders compact semantic status badges for
- * ERP-style record states, shell bars, and detail headers.
+ * This component renders compact semantic badges with reusable
+ * tone, emphasis, and sizing rules.
  *
  * The goal is consistency:
  * - calm semantic treatment
@@ -20,11 +20,22 @@ import type { ReactNode } from "react"
  * 1. PUBLIC API
  * ========================================
  */
+export type StatusBadgeTone =
+  | "neutral"
+  | "info"
+  | "success"
+  | "warning"
+  | "danger"
+
+export type StatusBadgeEmphasis = "subtle" | "strong"
+
+export type StatusBadgeSize = "sm" | "md"
+
 type StatusBadgeProps = {
   children: ReactNode
-  tone?: "neutral" | "info" | "success" | "warning" | "danger"
-  emphasis?: "subtle" | "strong"
-  size?: "sm" | "md"
+  tone?: StatusBadgeTone
+  emphasis?: StatusBadgeEmphasis
+  size?: StatusBadgeSize
   className?: string
 }
 

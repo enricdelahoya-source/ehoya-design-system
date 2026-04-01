@@ -1,7 +1,7 @@
 import type { ReactNode } from "react"
 import BrandStripe from "./BrandStripe"
+import CaseStatusBadge, { type CaseStatus } from "./CaseStatusBadge"
 import Link from "./Link"
-import StatusBadge from "./StatusBadge"
 
 /**
  * ========================================
@@ -19,15 +19,16 @@ import StatusBadge from "./StatusBadge"
  * 1. PUBLIC API
  * ========================================
  */
+type RecordShellBarBreadcrumb = {
+  label: string
+  href: string
+}
+
 type RecordShellBarProps = {
-  recordType: string
+  breadcrumbs?: RecordShellBarBreadcrumb[]
   title: string
   recordId?: string
-  status?: {
-    label: string
-    tone?: "neutral" | "info" | "success" | "warning" | "danger"
-    emphasis?: "subtle" | "strong"
-  }
+  status?: CaseStatus
   metadata?: ReactNode
   actions?: ReactNode
 }
@@ -38,8 +39,9 @@ type RecordShellBarProps = {
  * ========================================
  */
 export default function RecordShellBar({
-  recordType,
+  breadcrumbs,
   title,
+  recordId,
   status,
   metadata,
   actions,
@@ -61,7 +63,7 @@ export default function RecordShellBar({
 
   const contentRow = [
     "flex",
-    "items-center",
+    "items-start",
     "justify-between",
     "gap-[var(--space-stack-md)]",
   ].join(" ")
@@ -74,18 +76,33 @@ export default function RecordShellBar({
     "gap-[var(--space-2)]",
   ].join(" ")
 
-  const parentLinkClasses = [
+  const breadcrumbRow = [
+    "flex",
+    "flex-wrap",
+    "items-center",
+    "gap-x-[var(--space-2)]",
+    "gap-y-[var(--space-1)]",
+  ].join(" ")
+
+  const breadcrumbLinkClasses = [
     "text-xs",
     "font-medium",
     "text-[var(--color-text-muted)]",
     "leading-normal",
+    "hover:text-[var(--color-text-default)]",
+  ].join(" ")
+
+  const breadcrumbSeparatorClasses = [
+    "text-xs",
+    "leading-normal",
+    "text-[var(--color-text-subtle)]",
   ].join(" ")
 
   const titleRow = [
     "flex",
     "min-w-0",
     "flex-wrap",
-    "items-center",
+    "items-baseline",
     "gap-x-[var(--space-2)]",
     "gap-y-[0.125rem]",
   ].join(" ")
@@ -96,6 +113,22 @@ export default function RecordShellBar({
     "font-semibold",
     "leading-[1.2]",
     "text-[var(--color-text-default)]",
+  ].join(" ")
+
+  const recordIdClasses = [
+    "text-sm",
+    "font-medium",
+    "leading-normal",
+    "text-[var(--color-text-default)]",
+  ].join(" ")
+
+  const identityMetaRow = [
+    "flex",
+    "min-w-0",
+    "flex-wrap",
+    "items-center",
+    "gap-x-[var(--space-2)]",
+    "gap-y-[0.125rem]",
   ].join(" ")
 
   const metadataClasses = [
@@ -110,7 +143,7 @@ export default function RecordShellBar({
     "shrink-0",
     "items-center",
     "gap-actions-md",
-    "self-center",
+    "self-start",
   ].join(" ")
 
   /**
@@ -119,30 +152,55 @@ export default function RecordShellBar({
    * ========================================
    */
   return (
-    <section className={container} aria-label={`${recordType} shell bar`}>
+    <section className={container} aria-label="Record shell bar">
+      {breadcrumbs?.length ? (
+        <nav aria-label="Breadcrumb" className={breadcrumbRow}>
+          {breadcrumbs.map((breadcrumb, index) => (
+            <span key={breadcrumb.href} className="inline-flex items-center gap-[var(--space-2)]">
+              {index > 0 ? (
+                <span aria-hidden="true" className={breadcrumbSeparatorClasses}>
+                  /
+                </span>
+              ) : null}
+              <Link href={breadcrumb.href} className={breadcrumbLinkClasses}>
+                {breadcrumb.label}
+              </Link>
+            </span>
+          ))}
+        </nav>
+      ) : null}
+
       <div className={contentRow}>
         <div className={identity}>
-          <Link href="#" className={parentLinkClasses}>
-            {recordType}
-          </Link>
-
           <div className={titleRow}>
             <h2 className={titleClasses}>{title}</h2>
 
             {status ? (
-              <StatusBadge
-                tone={status.tone}
-                emphasis={status.emphasis}
+              <CaseStatusBadge
+                status={status}
+                emphasis="subtle"
                 size="md"
-                className="-translate-y-[1px] self-center"
-              >
-                {status.label}
-              </StatusBadge>
+                className="-translate-y-[3px] self-center"
+              />
             ) : null}
           </div>
 
-          {metadata ? (
-            <div className={metadataClasses}>{metadata}</div>
+          {recordId || metadata ? (
+            <div className={identityMetaRow}>
+              {recordId ? (
+                <div className={recordIdClasses}>{recordId}</div>
+              ) : null}
+
+              {recordId && metadata ? (
+                <span aria-hidden="true" className={metadataClasses}>
+                  •
+                </span>
+              ) : null}
+
+              {metadata ? (
+                <div className={metadataClasses}>{metadata}</div>
+              ) : null}
+            </div>
           ) : null}
         </div>
 
