@@ -110,7 +110,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
       "focus:border-[var(--color-field-error-border)]",
       "focus-visible:ring-1",
       "focus-visible:ring-[var(--color-focus-ring)]",
-      "focus-visible:ring-offset-1",
+      "focus-visible:ring-offset-0",
       "focus-visible:ring-offset-[var(--color-focus-ring-offset)]",
     ].join(" ")
   : [
@@ -118,7 +118,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
       "focus:border-[var(--color-field-border-focus)]",
       "focus-visible:ring-1",
       "focus-visible:ring-[var(--color-focus-ring)]",
-      "focus-visible:ring-offset-1",
+      "focus-visible:ring-offset-0",
       "focus-visible:ring-offset-[var(--color-focus-ring-offset)]",
     ].join(" ")
   /**

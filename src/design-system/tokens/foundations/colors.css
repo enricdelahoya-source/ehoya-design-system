@@ -52,5 +52,5 @@
   --color-brown-500: #7b5e3e;
   --color-brown-700: #664d33;
   --color-danger-surface: #fff6f4;
-  --color-focus-ring-soft: #a8846e;
+  --color-focus-ring-soft: color-mix(in srgb, var(--color-amber-500) 18%, var(--color-warm-450));
 }
