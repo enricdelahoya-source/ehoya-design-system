@@ -8,22 +8,14 @@ type BrandStripeProps = {
  */
 export default function BrandStripe({ className = "" }: BrandStripeProps) {
   const stripeClasses = [
-    "h-[2px]",
+    "h-[var(--space-half)]",
     "w-full",
     "shrink-0",
+    "bg-[linear-gradient(to_right,var(--color-brand-stripe-start)_0%,var(--color-brand-stripe-middle)_74%,var(--color-brand-stripe-end)_100%)]",
     className,
   ]
     .filter(Boolean)
     .join(" ")
 
-  return (
-    <div
-      aria-hidden="true"
-      className={stripeClasses}
-      style={{
-        background:
-          "linear-gradient(to right, rgba(200, 106, 42, 0.72) 0%, rgba(200, 106, 42, 0.88) 74%, var(--color-action-brand) 100%)",
-      }}
-    />
-  )
+  return <div aria-hidden="true" className={stripeClasses} />
 }

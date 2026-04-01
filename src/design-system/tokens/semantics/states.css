@@ -44,4 +44,8 @@
   --color-accent-hover: var(--color-orange-700);
   --color-accent-active: var(--color-orange-800);
   --color-on-accent: var(--color-warm-25);
+
+  --color-brand-stripe-start: color-mix(in srgb, var(--color-accent) 36%, transparent);
+  --color-brand-stripe-middle: color-mix(in srgb, var(--color-accent) 58%, var(--color-action-brand) 42%);
+  --color-brand-stripe-end: var(--color-action-brand);
 }
