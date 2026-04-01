@@ -18,10 +18,10 @@ export default function RecordSection({
   const sectionClasses = [
     "space-y-[var(--space-stack-sm)]",
     "border-b",
-    "border-[color-mix(in_srgb,var(--color-accent)_22%,var(--color-border-divider))]",
+    "border-[var(--color-border-divider)]",
     "px-[var(--space-section-sm)]",
-    "pt-[var(--space-6)]",
-    "pb-[var(--space-6)]",
+    "pt-[var(--space-5)]",
+    "pb-[var(--space-5)]",
     "md:px-[var(--space-section-md)]",
     className,
   ]
@@ -51,7 +51,7 @@ export default function RecordSection({
     "text-[color:var(--color-text-secondary)]",
   ].join(" ")
 
-  const contentClasses = ["pt-[var(--space-5)]"].join(" ")
+  const contentClasses = ["pt-[var(--space-4)]"].join(" ")
 
   return (
     <section aria-labelledby={titleId} className={sectionClasses}>

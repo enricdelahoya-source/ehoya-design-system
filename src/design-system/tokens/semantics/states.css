@@ -32,8 +32,8 @@
   --color-action-secondary-surface: var(--color-surface-elevated);
   --color-action-secondary-hover: var(--color-warm-175);
   --color-action-secondary-active: var(--color-warm-325);
-  --color-action-secondary-border: var(--color-border-control);
-  --color-action-secondary-border-hover: var(--color-border-control-hover);
+  --color-action-secondary-border: color-mix(in srgb, var(--color-accent) 48%, var(--color-warm-0));
+  --color-action-secondary-border-hover: color-mix(in srgb, var(--color-accent) 62%, var(--color-warm-0));
   --color-on-action-secondary: var(--color-text-brand);
 
   --color-action-ghost-hover: var(--color-warm-275);

@@ -10,7 +10,7 @@ export default function FieldGrid({
   const fieldGridClasses = [
     "grid",
     "gap-x-[var(--space-stack-lg)]",
-    "gap-y-[var(--space-stack-md)]",
+    "gap-y-[var(--space-stack-sm)]",
     "lg:grid-cols-3",
     className,
   ]

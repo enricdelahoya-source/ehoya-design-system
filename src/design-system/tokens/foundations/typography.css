@@ -10,15 +10,18 @@
 
   --text-record-title: 1.875rem;
   --text-section-title: 1.5rem;
+  --text-aside-title: 1rem;
   --text-field-label: var(--text-sm);
   --text-field-value: var(--text-md);
   --text-meta: var(--text-sm);
 
   --leading-record-title: 2.25rem;
   --leading-section-title: 2rem;
+  --leading-aside-title: 1.5rem;
 
   --font-weight-record-title: var(--font-weight-medium);
   --font-weight-section-title: var(--font-weight-medium);
+  --font-weight-aside-title: var(--font-weight-medium);
 
   --leading-tight: 1.2;
   --leading-snug: 1.35;

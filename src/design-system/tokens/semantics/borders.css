@@ -1,7 +1,7 @@
 @theme {
   --color-border-subtle: var(--color-warm-500);
   --color-border-strong: var(--color-warm-750);
-  --color-border-divider: var(--color-warm-450);
+  --color-border-divider: color-mix(in srgb, var(--color-accent) 28%, var(--color-warm-0));
   --color-border-focus: color-mix(in srgb, var(--color-amber-500) 72%, var(--color-orange-500));
   --color-border-danger: var(--color-red-500);
   --color-border-success: var(--color-green-500);

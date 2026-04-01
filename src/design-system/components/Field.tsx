@@ -100,14 +100,14 @@ export default function Field({
    * ========================================
    */
   const wrapper = [
-    "flex flex-col",
+    "flex min-w-0 flex-col",
     variant === "tight"
       ? "gap-[var(--space-1)]"
       : "gap-[var(--space-stack-xs)]",
   ].join(" ")
 
   const controlStack = [
-    "flex flex-col",
+    "flex min-w-0 flex-col",
     "gap-[var(--space-stack-xs)]",
   ].join(" ")
 

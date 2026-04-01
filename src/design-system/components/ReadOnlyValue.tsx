@@ -21,8 +21,11 @@ import type { ComponentPropsWithoutRef, ReactNode } from "react"
  * 1. PUBLIC API
  * ========================================
  */
+export type ReadOnlyValueBehavior = "compact" | "flexible" | "full-width"
+
 type ReadOnlyValueProps = {
   value?: ReactNode
+  behavior?: ReadOnlyValueBehavior
   multiline?: boolean
   variant?: "boxed" | "compact"
   size?: "sm" | "md"
@@ -38,6 +41,7 @@ type ReadOnlyValueProps = {
 export default function ReadOnlyValue({
   value,
   children,
+  behavior = "compact",
   multiline = false,
   variant = "boxed",
   size = "md",
@@ -96,10 +100,24 @@ export default function ReadOnlyValue({
         "whitespace-pre-wrap",
         "break-words",
       ].join(" ")
-    : [
-        "truncate",
-        "whitespace-nowrap",
-      ].join(" ")
+    : {
+        compact: [
+          "truncate",
+          "whitespace-nowrap",
+        ].join(" "),
+        flexible: [
+          "overflow-hidden",
+          "whitespace-normal",
+          "break-words",
+          "[display:-webkit-box]",
+          "[-webkit-box-orient:vertical]",
+          "[-webkit-line-clamp:2]",
+        ].join(" "),
+        "full-width": [
+          "whitespace-normal",
+          "break-words",
+        ].join(" "),
+      }[behavior]
 
   /**
    * ========================================
