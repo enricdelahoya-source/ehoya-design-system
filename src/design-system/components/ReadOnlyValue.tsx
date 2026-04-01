@@ -57,7 +57,10 @@ export default function ReadOnlyValue({
     "block",
     "w-full",
     "min-w-0",
-    "text-[var(--color-field-readonly-text)]",
+    "text-[length:var(--text-field-value)]",
+    "leading-[var(--leading-normal)]",
+    "font-normal",
+    "text-[color:var(--color-text-primary)]",
     "cursor-default",
     "select-text",
   ].join(" ")
@@ -115,8 +118,6 @@ export default function ReadOnlyValue({
           variant === "boxed"
             ? "py-[var(--space-2)]"
             : "py-0",
-          "text-sm",
-          "leading-normal",
         ].join(" ")
       : [
           variant === "boxed"
@@ -128,8 +129,6 @@ export default function ReadOnlyValue({
           variant === "boxed"
             ? "py-[var(--space-2)]"
             : "py-0",
-          "text-sm",
-          "leading-normal",
         ].join(" "),
     md: multiline
       ? [
@@ -142,8 +141,6 @@ export default function ReadOnlyValue({
           variant === "boxed"
             ? "py-[var(--space-3)]"
             : "py-0",
-          "text-sm",
-          "leading-normal",
         ].join(" ")
       : [
           variant === "boxed"
@@ -155,8 +152,6 @@ export default function ReadOnlyValue({
           variant === "boxed"
             ? "py-[var(--space-3)]"
             : "py-0",
-          "text-sm",
-          "leading-normal",
         ].join(" "),
   }
 

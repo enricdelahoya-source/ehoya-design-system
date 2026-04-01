@@ -56,9 +56,18 @@ export default function RecordShellBar({
    * identifier between title and metadata.
    */
   const container = [
+    "bg-[var(--color-surface-shell)]",
+    "mb-[var(--space-8)]",
+  ].join(" ")
+
+  const inner = [
     "flex",
     "flex-col",
     "gap-[var(--space-2)]",
+    "px-[var(--space-section-sm)]",
+    "pt-[var(--space-stack-md)]",
+    "pb-[var(--space-stack-md)]",
+    "md:px-[var(--space-section-md)]",
   ].join(" ")
 
   const contentRow = [
@@ -73,7 +82,7 @@ export default function RecordShellBar({
     "min-w-0",
     "flex-1",
     "flex-col",
-    "gap-[var(--space-2)]",
+    "gap-[var(--space-3)]",
   ].join(" ")
 
   const breadcrumbRow = [
@@ -85,17 +94,17 @@ export default function RecordShellBar({
   ].join(" ")
 
   const breadcrumbLinkClasses = [
-    "text-xs",
+    "text-[length:var(--text-meta)]",
+    "leading-[var(--leading-normal)]",
     "font-medium",
-    "text-[var(--color-text-muted)]",
-    "leading-normal",
-    "hover:text-[var(--color-text-default)]",
+    "text-[color:var(--color-text-muted)]",
+    "hover:text-[color:var(--color-text-secondary)]",
   ].join(" ")
 
   const breadcrumbSeparatorClasses = [
-    "text-xs",
-    "leading-normal",
-    "text-[var(--color-text-subtle)]",
+    "text-[length:var(--text-meta)]",
+    "leading-[var(--leading-normal)]",
+    "text-[color:var(--color-text-muted)]",
   ].join(" ")
 
   const titleRow = [
@@ -108,18 +117,23 @@ export default function RecordShellBar({
   ].join(" ")
 
   const titleClasses = [
+    "m-0",
     "min-w-0",
-    "text-xl",
-    "font-semibold",
-    "leading-[1.2]",
-    "text-[var(--color-text-default)]",
   ].join(" ")
 
+  const titleStyles = {
+    fontSize: "var(--text-record-title)",
+    lineHeight: "var(--leading-record-title)",
+    fontWeight: "var(--font-weight-record-title)",
+    letterSpacing: "normal",
+    color: "var(--color-text-record-title)",
+  } as const
+
   const recordIdClasses = [
-    "text-sm",
-    "font-medium",
-    "leading-normal",
-    "text-[var(--color-text-default)]",
+    "text-[length:var(--text-meta)]",
+    "leading-[var(--leading-normal)]",
+    "font-normal",
+    "text-[color:var(--color-text-secondary)]",
   ].join(" ")
 
   const identityMetaRow = [
@@ -133,9 +147,9 @@ export default function RecordShellBar({
 
   const metadataClasses = [
     "min-w-0",
-    "text-sm",
-    "leading-normal",
-    "text-[var(--color-text-muted)]",
+    "text-[length:var(--text-meta)]",
+    "leading-[var(--leading-normal)]",
+    "text-[color:var(--color-text-secondary)]",
   ].join(" ")
 
   const actionsClasses = [
@@ -153,63 +167,67 @@ export default function RecordShellBar({
    */
   return (
     <section className={container} aria-label="Record shell bar">
-      {breadcrumbs?.length ? (
-        <nav aria-label="Breadcrumb" className={breadcrumbRow}>
-          {breadcrumbs.map((breadcrumb, index) => (
-            <span key={breadcrumb.href} className="inline-flex items-center gap-[var(--space-2)]">
-              {index > 0 ? (
-                <span aria-hidden="true" className={breadcrumbSeparatorClasses}>
-                  /
-                </span>
+      <div className={inner}>
+        {breadcrumbs?.length ? (
+          <nav aria-label="Breadcrumb" className={breadcrumbRow}>
+            {breadcrumbs.map((breadcrumb, index) => (
+              <span key={breadcrumb.href} className="inline-flex items-center gap-[var(--space-2)]">
+                {index > 0 ? (
+                  <span aria-hidden="true" className={breadcrumbSeparatorClasses}>
+                    /
+                  </span>
+                ) : null}
+                <Link href={breadcrumb.href} className={breadcrumbLinkClasses}>
+                  {breadcrumb.label}
+                </Link>
+              </span>
+            ))}
+          </nav>
+        ) : null}
+
+        <div className={contentRow}>
+          <div className={identity}>
+            <div className={titleRow}>
+              <h1 className={titleClasses} style={titleStyles}>
+                {title}
+              </h1>
+
+              {status ? (
+                <CaseStatusBadge
+                  status={status}
+                  emphasis="subtle"
+                  size="md"
+                  className="-translate-y-[3px] self-center"
+                />
               ) : null}
-              <Link href={breadcrumb.href} className={breadcrumbLinkClasses}>
-                {breadcrumb.label}
-              </Link>
-            </span>
-          ))}
-        </nav>
-      ) : null}
+            </div>
 
-      <div className={contentRow}>
-        <div className={identity}>
-          <div className={titleRow}>
-            <h2 className={titleClasses}>{title}</h2>
+            {recordId || metadata ? (
+              <div className={identityMetaRow}>
+                {recordId ? (
+                  <div className={recordIdClasses}>{recordId}</div>
+                ) : null}
 
-            {status ? (
-              <CaseStatusBadge
-                status={status}
-                emphasis="subtle"
-                size="md"
-                className="-translate-y-[3px] self-center"
-              />
+                {recordId && metadata ? (
+                  <span aria-hidden="true" className={metadataClasses}>
+                    •
+                  </span>
+                ) : null}
+
+                {metadata ? (
+                  <div className={metadataClasses}>{metadata}</div>
+                ) : null}
+              </div>
             ) : null}
           </div>
 
-          {recordId || metadata ? (
-            <div className={identityMetaRow}>
-              {recordId ? (
-                <div className={recordIdClasses}>{recordId}</div>
-              ) : null}
-
-              {recordId && metadata ? (
-                <span aria-hidden="true" className={metadataClasses}>
-                  •
-                </span>
-              ) : null}
-
-              {metadata ? (
-                <div className={metadataClasses}>{metadata}</div>
-              ) : null}
-            </div>
+          {actions ? (
+            <div className={actionsClasses}>{actions}</div>
           ) : null}
         </div>
-
-        {actions ? (
-          <div className={actionsClasses}>{actions}</div>
-        ) : null}
       </div>
 
-      <BrandStripe className="mt-[2px]" />
+      <BrandStripe />
     </section>
   )
 }

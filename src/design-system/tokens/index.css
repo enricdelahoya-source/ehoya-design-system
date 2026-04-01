@@ -24,3 +24,19 @@
 @utility gap-actions-md {
   gap: var(--space-actions-md);
 }
+
+@utility text-record-title {
+  font-size: var(--text-record-title);
+  line-height: var(--leading-record-title);
+  font-weight: var(--font-weight-record-title);
+  letter-spacing: normal;
+  color: var(--color-text-record-title);
+}
+
+@utility text-section-title {
+  font-size: var(--text-section-title);
+  line-height: var(--leading-section-title);
+  font-weight: var(--font-weight-section-title);
+  letter-spacing: normal;
+  color: var(--color-text-section-title);
+}

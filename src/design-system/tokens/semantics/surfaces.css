@@ -4,6 +4,7 @@
   --color-surface-hover: var(--color-warm-225);
   --color-surface-muted: var(--color-warm-300);
   --color-surface-elevated: var(--color-warm-50);
+  --color-surface-shell: var(--color-warm-25);
   --color-surface-selected: var(--color-warm-250);
   --color-surface-inverse: var(--color-warm-950);
 }

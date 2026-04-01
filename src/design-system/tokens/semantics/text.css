@@ -1,7 +1,12 @@
 @theme {
-  --color-text-default: var(--color-ink-900);
-  --color-text-muted: var(--color-warm-900);
-  --color-text-subtle: var(--color-warm-850);
+  --color-text-primary: var(--color-ink-900);
+  --color-text-secondary: var(--color-warm-900);
+  --color-text-muted: var(--color-warm-850);
+  --color-text-record-title: var(--color-text-primary);
+  --color-text-section-title: var(--color-text-primary);
+
+  --color-text-default: var(--color-text-primary);
+  --color-text-subtle: var(--color-text-muted);
   --color-text-inverse: var(--color-warm-0);
 
   --color-text-brand: var(--color-red-550);

@@ -118,12 +118,12 @@ export default function Field({
    * ========================================
    */
   const labelClasses = [
-    "text-sm",
-    "leading-normal",
-    "font-medium",
+    "text-[length:var(--text-field-label)]",
+    "leading-[var(--leading-normal)]",
+    "font-normal",
     childDisabled
       ? "text-[var(--color-disabled-text)]"
-      : "text-[var(--color-text-default)]",
+      : "text-[color:var(--color-text-secondary)]",
   ].join(" ")
 
   /**
@@ -133,9 +133,9 @@ export default function Field({
    * ========================================
    */
   const hintClasses = [
-    "text-xs",
-    "leading-normal",
-    "text-[var(--color-text-muted)]",
+    "text-[length:var(--text-meta)]",
+    "leading-[var(--leading-normal)]",
+    "text-[color:var(--color-text-muted)]",
   ].join(" ")
 
   const errorClasses = [
