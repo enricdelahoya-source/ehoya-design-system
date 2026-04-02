@@ -11,7 +11,7 @@ export default function BrandStripe({ className = "" }: BrandStripeProps) {
     "h-[var(--space-half)]",
     "w-full",
     "shrink-0",
-    "bg-[var(--color-surface-selected)]",
+    "bg-[var(--color-accent)]",
     className,
   ]
     .filter(Boolean)

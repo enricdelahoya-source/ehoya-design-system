@@ -7,7 +7,7 @@
   --badge-height-md: 1.5rem;
   --badge-padding-inline-sm: 0.375rem;
   --badge-padding-inline-md: 0.5rem;
-  --badge-radius: var(--radius-sm);
+  --badge-radius: var(--radius-pill);
 
   --color-badge-neutral-subtle-bg: color-mix(in srgb, var(--color-surface-muted) 58%, var(--color-surface-elevated));
   --color-badge-neutral-subtle-text: var(--color-text-default);
