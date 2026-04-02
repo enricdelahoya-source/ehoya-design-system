@@ -1,14 +1,15 @@
+// Control primitive: editable select control.
 import { forwardRef } from "react"
-import type { InputHTMLAttributes } from "react"
+import type { SelectHTMLAttributes } from "react"
 
 /**
  * ========================================
- * INPUT
- * Design-system input primitive
+ * SELECT
+ * Design-system select primitive
  * ========================================
  *
- * This component wraps the native <input> element and focuses
- * only on control styling and native input behavior.
+ * This component wraps the native <select> element and focuses
+ * only on control styling and native select behavior.
  *
  * Shared field structure like labels, hints, and errors lives
  * in the Field wrapper component.
@@ -19,21 +20,22 @@ import type { InputHTMLAttributes } from "react"
  * 1. PUBLIC API
  * ========================================
  */
-type InputProps = {
+type SelectProps = {
   size?: "sm" | "md"
-} & Omit<InputHTMLAttributes<HTMLInputElement>, "size">
+} & Omit<SelectHTMLAttributes<HTMLSelectElement>, "size">
 
 /**
  * ========================================
  * 2. COMPONENT
  * ========================================
  */
-const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
+const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select(
   {
     size = "md",
     className = "",
     disabled,
     "aria-invalid": ariaInvalid,
+    children,
     ...props
   },
   ref
@@ -43,7 +45,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
 
   /**
    * ========================================
-   * 3. BASE INPUT
+   * 3. BASE SELECT
    * ========================================
    *
    * Keep this neutral.
@@ -52,20 +54,24 @@ const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
   const base = [
     "w-full",
     "min-w-0",
+    "appearance-none",
     "rounded-[var(--radius-sm)]",
     "border-[length:var(--border-width-control)]",
     "py-0",
     "outline-none",
-    "transition-[border-color,box-shadow,background-color,color]",
     "bg-[var(--color-field-bg)]",
     "text-[var(--color-field-text)]",
-    "placeholder:text-[var(--color-field-placeholder)]",
+    "transition-[border-color,box-shadow,background-color,color]",
+    "bg-[image:linear-gradient(45deg,transparent_50%,var(--color-field-text)_50%),linear-gradient(135deg,var(--color-field-text)_50%,transparent_50%)]",
+    "bg-[position:calc(100%-1.25rem)_calc(50%-0.125rem),calc(100%-0.9375rem)_calc(50%-0.125rem)]",
+    "bg-[size:0.375rem_0.375rem,0.375rem_0.375rem]",
+    "bg-no-repeat",
 
     "disabled:cursor-not-allowed",
     "disabled:bg-[var(--color-disabled-bg)]",
     "disabled:text-[var(--color-disabled-text)]",
     "disabled:border-[var(--color-disabled-border)]",
-    "disabled:placeholder:text-[var(--color-disabled-text)]",
+    "disabled:bg-[image:linear-gradient(45deg,transparent_50%,var(--color-disabled-text)_50%),linear-gradient(135deg,var(--color-disabled-text)_50%,transparent_50%)]",
   ].join(" ")
 
   /**
@@ -113,6 +119,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
       "focus:border-[length:var(--border-width-control-focus)]",
       "focus:border-[var(--color-field-border-focus)]",
     ].join(" ")
+
   /**
    * ========================================
    * 6. SIZE
@@ -121,13 +128,15 @@ const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
   const sizes = {
     sm: [
       "h-[var(--control-height-sm)]",
-      "px-[var(--space-inline-sm)]",
+      "pl-[var(--space-inline-sm)]",
+      "pr-[calc(var(--space-inline-sm)+1.5rem)]",
       "text-sm",
       "leading-normal",
     ].join(" "),
     md: [
       "h-[var(--control-height-md)]",
-      "px-[var(--space-inline-md)]",
+      "pl-[var(--space-inline-md)]",
+      "pr-[calc(var(--space-inline-md)+1.5rem)]",
       "text-sm",
       "leading-normal",
     ].join(" "),
@@ -138,7 +147,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
    * 7. FINAL COMPOSITION
    * ========================================
    */
-  const inputClasses = [base, stateClasses, focusClasses, sizes[size], className]
+  const selectClasses = [base, stateClasses, focusClasses, sizes[size], className]
     .filter(Boolean)
     .join(" ")
 
@@ -148,14 +157,16 @@ const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
    * ========================================
    */
   return (
-    <input
+    <select
       ref={ref}
-      className={inputClasses}
+      className={selectClasses}
       disabled={disabled}
       aria-invalid={ariaInvalid}
       {...props}
-    />
+    >
+      {children}
+    </select>
   )
 })
 
-export default Input
+export default Select

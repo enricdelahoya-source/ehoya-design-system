@@ -1,3 +1,4 @@
+// Field-group layout: grid for editable form field collections.
 import type { ComponentPropsWithoutRef } from "react"
 
 type FormFieldGridProps = ComponentPropsWithoutRef<"div">

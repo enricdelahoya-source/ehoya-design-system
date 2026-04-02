@@ -1,3 +1,4 @@
+// Field wrapper: editable field chrome around a control primitive.
 import {
   cloneElement,
   isValidElement,

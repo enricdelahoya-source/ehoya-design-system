@@ -1,3 +1,4 @@
+// Section wrapper: groups read-only record content within a section.
 import { useId, type ReactNode } from "react"
 
 type RecordSectionProps = {

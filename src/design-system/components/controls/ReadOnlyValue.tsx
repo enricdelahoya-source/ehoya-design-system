@@ -1,3 +1,4 @@
+// Control primitive: read-only value surface for display mode.
 import type { ComponentPropsWithoutRef, ReactNode } from "react"
 
 /**

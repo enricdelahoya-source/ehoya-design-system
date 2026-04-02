@@ -1,12 +1,13 @@
+// Field-group layout: vertical stack for grouped fields or values.
 import type { ComponentPropsWithoutRef } from "react"
 
-type FieldStackProps = ComponentPropsWithoutRef<"div">
+type FieldGroupStackProps = ComponentPropsWithoutRef<"div">
 
-export default function FieldStack({
+export default function FieldGroupStack({
   className = "",
   children,
   ...props
-}: FieldStackProps) {
+}: FieldGroupStackProps) {
   const fieldStackClasses = [
     "flex",
     "flex-col",

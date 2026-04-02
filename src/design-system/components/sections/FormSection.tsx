@@ -1,3 +1,4 @@
+// Section wrapper: groups editable form content within a section.
 import { useId, type ReactNode } from "react"
 
 type FormSectionProps = {

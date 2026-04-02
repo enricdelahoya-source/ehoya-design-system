@@ -1,12 +1,13 @@
+// Field-group layout: grid for read-only record field collections.
 import type { ComponentPropsWithoutRef } from "react"
 
-type FieldGridProps = ComponentPropsWithoutRef<"div">
+type RecordFieldGridProps = ComponentPropsWithoutRef<"div">
 
-export default function FieldGrid({
+export default function RecordFieldGrid({
   className = "",
   children,
   ...props
-}: FieldGridProps) {
+}: RecordFieldGridProps) {
   const fieldGridClasses = [
     "grid",
     "gap-x-[var(--space-stack-lg)]",

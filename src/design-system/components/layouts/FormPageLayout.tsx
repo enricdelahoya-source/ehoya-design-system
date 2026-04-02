@@ -1,12 +1,13 @@
+// Page layout: constrains and spaces editable form pages.
 import type { ComponentPropsWithoutRef } from "react"
 
-type FormLayoutProps = ComponentPropsWithoutRef<"div">
+type FormPageLayoutProps = ComponentPropsWithoutRef<"div">
 
-export default function FormLayout({
+export default function FormPageLayout({
   className = "",
   children,
   ...props
-}: FormLayoutProps) {
+}: FormPageLayoutProps) {
   const outerClasses = [
     "px-[var(--space-section-sm)]",
     "md:px-[var(--space-section-md)]",

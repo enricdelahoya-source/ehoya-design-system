@@ -1,14 +1,15 @@
+// Control primitive: editable single-line text input.
 import { forwardRef } from "react"
-import type { TextareaHTMLAttributes } from "react"
+import type { InputHTMLAttributes } from "react"
 
 /**
  * ========================================
- * TEXTAREA
- * Design-system textarea primitive
+ * INPUT
+ * Design-system input primitive
  * ========================================
  *
- * This component wraps the native <textarea> element and focuses
- * only on control styling and native textarea behavior.
+ * This component wraps the native <input> element and focuses
+ * only on control styling and native input behavior.
  *
  * Shared field structure like labels, hints, and errors lives
  * in the Field wrapper component.
@@ -19,16 +20,16 @@ import type { TextareaHTMLAttributes } from "react"
  * 1. PUBLIC API
  * ========================================
  */
-type TextareaProps = {
+type InputProps = {
   size?: "sm" | "md"
-} & TextareaHTMLAttributes<HTMLTextAreaElement>
+} & Omit<InputHTMLAttributes<HTMLInputElement>, "size">
 
 /**
  * ========================================
  * 2. COMPONENT
  * ========================================
  */
-const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function Textarea(
+const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
   {
     size = "md",
     className = "",
@@ -43,7 +44,7 @@ const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function Textare
 
   /**
    * ========================================
-   * 3. BASE TEXTAREA
+   * 3. BASE INPUT
    * ========================================
    *
    * Keep this neutral.
@@ -54,8 +55,8 @@ const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function Textare
     "min-w-0",
     "rounded-[var(--radius-sm)]",
     "border-[length:var(--border-width-control)]",
+    "py-0",
     "outline-none",
-    "resize-y",
     "transition-[border-color,box-shadow,background-color,color]",
     "bg-[var(--color-field-bg)]",
     "text-[var(--color-field-text)]",
@@ -95,36 +96,39 @@ const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function Textare
    * ========================================
    *
    * Border thickness communicates interaction state.
+   *
+   * Normal focus:
+   * - thicker neutral border
+   * - no outer ring
+   *
+   * Error focus:
+   * - keep red border
+   * - no outer ring
    */
   const focusClasses = isInvalid
-    ? [
-        "focus:border-[length:var(--border-width-control-focus)]",
-        "focus:border-[var(--color-field-error-border)]",
-      ].join(" ")
-    : [
-        "focus:border-[length:var(--border-width-control-focus)]",
-        "focus:border-[var(--color-field-border-focus)]",
-      ].join(" ")
-
+  ? [
+      "focus:border-[length:var(--border-width-control-focus)]",
+      "focus:border-[var(--color-field-error-border)]",
+    ].join(" ")
+  : [
+      "focus:border-[length:var(--border-width-control-focus)]",
+      "focus:border-[var(--color-field-border-focus)]",
+    ].join(" ")
   /**
    * ========================================
    * 6. SIZE
    * ========================================
-   *
-   * Textareas use padding + min-height instead of fixed height.
    */
   const sizes = {
     sm: [
-      "min-h-[calc(var(--control-height-sm)*2.75)]",
+      "h-[var(--control-height-sm)]",
       "px-[var(--space-inline-sm)]",
-      "py-[var(--space-1)]",
       "text-sm",
       "leading-normal",
     ].join(" "),
     md: [
-      "min-h-[calc(var(--control-height-md)*2.75)]",
+      "h-[var(--control-height-md)]",
       "px-[var(--space-inline-md)]",
-      "py-[var(--space-2)]",
       "text-sm",
       "leading-normal",
     ].join(" "),
@@ -135,7 +139,7 @@ const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function Textare
    * 7. FINAL COMPOSITION
    * ========================================
    */
-  const textareaClasses = [base, stateClasses, focusClasses, sizes[size], className]
+  const inputClasses = [base, stateClasses, focusClasses, sizes[size], className]
     .filter(Boolean)
     .join(" ")
 
@@ -145,9 +149,9 @@ const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function Textare
    * ========================================
    */
   return (
-    <textarea
+    <input
       ref={ref}
-      className={textareaClasses}
+      className={inputClasses}
       disabled={disabled}
       aria-invalid={ariaInvalid}
       {...props}
@@ -155,4 +159,4 @@ const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function Textare
   )
 })
 
-export default Textarea
+export default Input
