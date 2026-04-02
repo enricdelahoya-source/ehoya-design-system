@@ -53,7 +53,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
     "w-full",
     "min-w-0",
     "rounded-[var(--radius-sm)]",
-    "border",
+    "border-[length:var(--border-width-control)]",
     "py-0",
     "outline-none",
     "transition-[border-color,box-shadow,background-color,color]",
@@ -106,11 +106,11 @@ const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
    */
   const focusClasses = isInvalid
   ? [
-      "focus:border-2",
+      "focus:border-[length:var(--border-width-control-focus)]",
       "focus:border-[var(--color-field-error-border)]",
     ].join(" ")
   : [
-      "focus:border-2",
+      "focus:border-[length:var(--border-width-control-focus)]",
       "focus:border-[var(--color-field-border-focus)]",
     ].join(" ")
   /**

@@ -107,7 +107,7 @@ export default function Button({
     secondary: [
       "bg-transparent",
       "text-on-secondary",
-      "border-[1.5px]",
+      "border-[length:var(--border-width-action-secondary)]",
       "border-secondary-border",
 
       // subtle brand on interaction
@@ -141,9 +141,9 @@ export default function Button({
    */
   const sizes = {
     sm: [
-      "h-[var(--control-height-sm)]",
+      "h-[var(--control-height-xs)]",
       "px-[var(--space-inline-sm)]",
-      "text-sm",
+      "text-xs",
       "leading-normal",
     ].join(" "),
 

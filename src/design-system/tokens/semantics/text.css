@@ -4,6 +4,13 @@
   --color-text-muted: var(--color-warm-850);
   --color-text-record-title: var(--color-text-primary);
   --color-text-section-title: var(--color-text-primary);
+  --text-shellbar-record-id: var(--text-meta);
+  --leading-shellbar-record-id: var(--leading-normal);
+  --color-text-shellbar-record-id: var(--color-text-secondary);
+
+  --text-shellbar-dirty: var(--text-xs);
+  --leading-shellbar-dirty: var(--leading-normal);
+  --color-text-shellbar-dirty: var(--color-text-muted);
 
   --color-text-default: var(--color-text-primary);
   --color-text-subtle: var(--color-text-muted);

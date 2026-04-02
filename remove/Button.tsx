@@ -39,7 +39,7 @@ export default function Button({
   // 4. VARIANTS (SEMANTIC MEANING)
   // ==============================
   // Each variant represents a different level of emphasis or intent
-  // NOTE: currently hardcoded colors → should later use tokens
+  // NOTE: currently hardcoded colors -> should later use tokens
   const variants = {
     // High emphasis action (primary CTA)
     primary: "bg-blue-600 text-white hover:bg-blue-700",

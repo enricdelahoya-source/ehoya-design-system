@@ -11,6 +11,7 @@
 @import "./semantics/states.css";
 
 @import "./components/actions.css";
+@import "./components/badge.css";
 @import "./components/field.css";
 @import "./components/table.css";
 

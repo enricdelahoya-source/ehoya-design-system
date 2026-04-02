@@ -61,7 +61,7 @@ export default function Tabs({
     "inline-flex",
     "items-center",
     "justify-center",
-    "border-b-2",
+    "border-b-[length:var(--border-width-navigation-active)]",
     "border-transparent",
     "bg-transparent",
     "px-[var(--space-3)]",

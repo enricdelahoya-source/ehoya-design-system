@@ -11,7 +11,7 @@ export default function BrandStripe({ className = "" }: BrandStripeProps) {
     "h-[var(--space-half)]",
     "w-full",
     "shrink-0",
-    "bg-[linear-gradient(to_right,var(--color-brand-stripe-start)_0%,var(--color-brand-stripe-middle)_74%,var(--color-brand-stripe-end)_100%)]",
+    "bg-[var(--color-surface-selected)]",
     className,
   ]
     .filter(Boolean)

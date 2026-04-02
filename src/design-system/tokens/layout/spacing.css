@@ -3,6 +3,9 @@
   --space-inline-md: var(--space-3);
   --space-inline-lg: var(--space-4);
 
+  --space-inline-meta-wrap: 0.125rem;
+  --offset-status-badge-inline: 3px;
+
 
   --space-stack-2xs: var(--space-1);
   --space-stack-xs: var(--space-2);

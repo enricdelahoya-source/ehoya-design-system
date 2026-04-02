@@ -55,7 +55,7 @@ const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select(
     "min-w-0",
     "appearance-none",
     "rounded-[var(--radius-sm)]",
-    "border",
+    "border-[length:var(--border-width-control)]",
     "py-0",
     "outline-none",
     "bg-[var(--color-field-bg)]",
@@ -111,11 +111,11 @@ const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select(
    */
   const focusClasses = isInvalid
   ? [
-      "focus:border-2",
+      "focus:border-[length:var(--border-width-control-focus)]",
       "focus:border-[var(--color-field-error-border)]",
     ].join(" ")
   : [
-      "focus:border-2",
+      "focus:border-[length:var(--border-width-control-focus)]",
       "focus:border-[var(--color-field-border-focus)]",
     ].join(" ")
 

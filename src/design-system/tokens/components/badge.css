@@ -1,0 +1,41 @@
+@theme {
+  --text-badge: var(--text-sm);
+  --leading-badge: var(--leading-normal);
+  --font-weight-badge: var(--font-weight-medium);
+
+  --badge-height-sm: 1.375rem;
+  --badge-height-md: 1.5rem;
+  --badge-padding-inline-sm: 0.375rem;
+  --badge-padding-inline-md: 0.5rem;
+  --badge-radius: var(--radius-sm);
+
+  --color-badge-neutral-subtle-bg: color-mix(in srgb, var(--color-surface-muted) 58%, var(--color-surface-elevated));
+  --color-badge-neutral-subtle-text: var(--color-text-default);
+  --color-badge-neutral-subtle-border: color-mix(in srgb, var(--color-border-subtle) 70%, transparent);
+  --color-badge-neutral-strong-bg: var(--color-surface-inverse);
+  --color-badge-neutral-strong-text: var(--color-text-inverse);
+
+  --color-badge-info-subtle-bg: color-mix(in srgb, var(--color-info) 10%, var(--color-surface-elevated));
+  --color-badge-info-subtle-text: var(--color-info);
+  --color-badge-info-subtle-border: color-mix(in srgb, var(--color-info) 16%, var(--color-border-subtle));
+  --color-badge-info-strong-bg: var(--color-info);
+  --color-badge-info-strong-text: var(--color-on-info);
+
+  --color-badge-success-subtle-bg: color-mix(in srgb, var(--color-success) 10%, var(--color-surface-elevated));
+  --color-badge-success-subtle-text: var(--color-success);
+  --color-badge-success-subtle-border: color-mix(in srgb, var(--color-success) 16%, var(--color-border-subtle));
+  --color-badge-success-strong-bg: var(--color-success);
+  --color-badge-success-strong-text: var(--color-on-success);
+
+  --color-badge-warning-subtle-bg: color-mix(in srgb, var(--color-warning) 10%, var(--color-surface-elevated));
+  --color-badge-warning-subtle-text: var(--color-warning);
+  --color-badge-warning-subtle-border: color-mix(in srgb, var(--color-warning) 18%, var(--color-border-subtle));
+  --color-badge-warning-strong-bg: var(--color-warning);
+  --color-badge-warning-strong-text: var(--color-on-warning);
+
+  --color-badge-danger-subtle-bg: color-mix(in srgb, var(--color-danger) 10%, var(--color-surface-elevated));
+  --color-badge-danger-subtle-text: var(--color-danger);
+  --color-badge-danger-subtle-border: color-mix(in srgb, var(--color-danger) 16%, var(--color-border-subtle));
+  --color-badge-danger-strong-bg: var(--color-danger);
+  --color-badge-danger-strong-text: var(--color-on-danger);
+}

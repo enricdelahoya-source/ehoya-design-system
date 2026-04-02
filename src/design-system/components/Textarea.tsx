@@ -53,7 +53,7 @@ const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function Textare
     "w-full",
     "min-w-0",
     "rounded-[var(--radius-sm)]",
-    "border",
+    "border-[length:var(--border-width-control)]",
     "outline-none",
     "resize-y",
     "transition-[border-color,box-shadow,background-color,color]",
@@ -98,11 +98,11 @@ const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function Textare
    */
   const focusClasses = isInvalid
     ? [
-        "focus:border-2",
+        "focus:border-[length:var(--border-width-control-focus)]",
         "focus:border-[var(--color-field-error-border)]",
       ].join(" ")
     : [
-        "focus:border-2",
+        "focus:border-[length:var(--border-width-control-focus)]",
         "focus:border-[var(--color-field-border-focus)]",
       ].join(" ")
 

@@ -4,10 +4,10 @@
 *, *::before, *::after { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; min-height: 100%; }
 body {
-  font-family: var(--font-sans, system-ui, sans-serif);
-  background: var(--color-page, #f2f0eb);
-  color: var(--color-text-default, #1f1b17);
-  line-height: 1.5;
+  font-family: var(--font-sans);
+  background: var(--color-page);
+  color: var(--color-text-default);
+  line-height: var(--leading-normal);
 }
 
 #root {
@@ -27,19 +27,4 @@ h2 {
 }
 p {
   margin: 0;
-}
-
-code,
-.counter {
-  font-family: var(--mono);
-  display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-h);
-}
-
-code {
-  font-size: 15px;
-  line-height: 135%;
-  padding: 4px 8px;
-  background: var(--code-bg);
 }

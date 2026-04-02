@@ -61,7 +61,7 @@ export default function RecordShellBar({
    */
   const container = [
     mode === "edit"
-      ? "bg-[color-mix(in_srgb,var(--color-accent)_4%,var(--color-surface-shell))]"
+      ? "bg-[var(--color-surface-shell-editing)]"
       : "bg-[var(--color-surface-shell)]",
     "mb-[var(--space-8)]",
   ].join(" ")
@@ -119,7 +119,7 @@ export default function RecordShellBar({
     "flex-wrap",
     "items-baseline",
     "gap-x-[var(--space-2)]",
-    "gap-y-[0.125rem]",
+    "gap-y-[var(--space-inline-meta-wrap)]",
   ].join(" ")
 
   const titleClasses = [
@@ -136,10 +136,10 @@ export default function RecordShellBar({
   } as const
 
   const recordIdClasses = [
-    "text-[length:var(--text-meta)]",
-    "leading-[var(--leading-normal)]",
+    "text-[length:var(--text-shellbar-record-id)]",
+    "leading-[var(--leading-shellbar-record-id)]",
     "font-normal",
-    "text-[color:var(--color-text-secondary)]",
+    "text-[color:var(--color-text-shellbar-record-id)]",
   ].join(" ")
 
   const identityMetaRow = [
@@ -148,7 +148,7 @@ export default function RecordShellBar({
     "flex-wrap",
     "items-center",
     "gap-x-[var(--space-2)]",
-    "gap-y-[0.125rem]",
+    "gap-y-[var(--space-inline-meta-wrap)]",
   ].join(" ")
 
   const metadataClasses = [
@@ -171,10 +171,10 @@ export default function RecordShellBar({
   ].join(" ")
 
   const dirtyIndicatorClasses = [
-    "text-xs",
-    "leading-[var(--leading-normal)]",
+    "text-[length:var(--text-shellbar-dirty)]",
+    "leading-[var(--leading-shellbar-dirty)]",
     "font-normal",
-    "text-[color:var(--color-text-muted)]",
+    "text-[color:var(--color-text-shellbar-dirty)]",
     "whitespace-nowrap",
   ].join(" ")
 
@@ -226,7 +226,10 @@ export default function RecordShellBar({
               </h1>
 
               {showStatus && status ? (
-                <span className={titleBadgeClasses} style={{ transform: "translateY(3px)" }}>
+                <span
+                  className={titleBadgeClasses}
+                  style={{ transform: "translateY(var(--offset-status-badge-inline))" }}
+                >
                   <CaseStatusBadge
                     status={status}
                     emphasis="subtle"

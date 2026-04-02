@@ -1,4 +1,9 @@
 @theme {
+  --border-width-control: 1px;
+  --border-width-control-focus: 2px;
+  --border-width-action-secondary: 1.5px;
+  --border-width-navigation-active: 2px;
+
   --color-border-subtle: var(--color-warm-500);
   --color-border-strong: var(--color-warm-750);
   --color-border-divider: color-mix(in srgb, var(--color-accent) 28%, var(--color-warm-0));
