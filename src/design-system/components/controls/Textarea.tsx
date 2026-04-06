@@ -87,7 +87,7 @@ const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function Textare
         "border",
         "border-[var(--color-field-border)]",
         "hover:border-[var(--color-field-border-hover)]",
-        "hover:bg-[var(--color-field-hover)]",
+        "hover:bg-[var(--color-surface-muted)]",
       ].join(" ")
 
   /**

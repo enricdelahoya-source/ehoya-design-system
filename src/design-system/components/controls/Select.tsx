@@ -92,7 +92,7 @@ const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select(
         "border",
         "border-[var(--color-field-border)]",
         "hover:border-[var(--color-field-border-hover)]",
-        "hover:bg-[var(--color-field-hover)]",
+        "hover:bg-[var(--color-surface-muted)]",
       ].join(" ")
 
   /**

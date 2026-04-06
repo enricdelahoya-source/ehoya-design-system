@@ -1,4 +1,5 @@
 import { useState } from "react"
+import CasesListTemplate from "./case-list/CasesListTemplate"
 import { renderCaseRecordSection } from "./case-record/renderers"
 import { getCaseRecordSections, STATUS_OPTIONS } from "./case-record/schema"
 import type { CaseRecord, SectionConfig } from "./case-record/types"
@@ -774,13 +775,59 @@ export default function App() {
   const highPriorityCaseCount = cases.filter(
     (record) => record.priority === "High" || record.priority === "Critical"
   ).length
+  const caseListSummaryItems = (
+    [
+      { id: "open", label: "Open", value: openCaseCount },
+      { id: "waiting_on_customer", label: "Waiting on customer", value: waitingCaseCount },
+      { id: "on_hold", label: "On hold", value: onHoldCaseCount },
+      { id: "high_priority", label: "High priority", value: highPriorityCaseCount },
+    ] satisfies typeof caseListKpiItems
+  )
+  const trimmedCaseSearch = caseSearch.trim()
+  const selectedCaseKpiItem =
+    caseKpiFilter === null
+      ? undefined
+      : caseListSummaryItems.find((item) => item.id === caseKpiFilter)
+  const selectedCaseStatusOption =
+    caseStatusFilter === "all"
+      ? undefined
+      : STATUS_OPTIONS.find((option) => option.value === caseStatusFilter)
+  const activeCaseFilters = [
+    ...(selectedCaseKpiItem
+      ? [
+          {
+            id: "kpi" as const,
+            label: selectedCaseKpiItem.label,
+            clear: () => setCaseKpiFilter(null),
+          },
+        ]
+      : []),
+    ...(selectedCaseStatusOption
+      ? [
+          {
+            id: "status" as const,
+            label: `Status: ${selectedCaseStatusOption.label}`,
+            clear: () => setCaseStatusFilter("all"),
+          },
+        ]
+      : []),
+    ...(trimmedCaseSearch !== ""
+      ? [
+          {
+            id: "search" as const,
+            label: `Search: ${trimmedCaseSearch}`,
+            clear: () => setCaseSearch(""),
+          },
+        ]
+      : []),
+  ]
   const filteredCases = cases.filter((record) => {
     const matchesSearch =
-      caseSearch.trim() === "" ||
+      trimmedCaseSearch === "" ||
       [record.id, record.title, record.customer, record.assignee]
         .join(" ")
         .toLowerCase()
-        .includes(caseSearch.trim().toLowerCase())
+        .includes(trimmedCaseSearch.toLowerCase())
 
     const matchesStatus =
       caseStatusFilter === "all" || record.status === caseStatusFilter
@@ -922,7 +969,7 @@ export default function App() {
   }
 
   return (
-    <main className="min-h-screen bg-page text-text-default [font-family:var(--font-sans)]">
+    <main className="min-h-screen bg-page text-text-default [font-family:var(--font-sans)] border-t border-[var(--color-border-divider)]">
       <PageContent width="xl">
         <div className="space-y-[var(--space-4)]">
           <div className="space-y-[var(--space-2)]">
@@ -941,51 +988,43 @@ export default function App() {
 
         {playgroundView === "screen" ? (
           screenView === "list" ? (
-          <div className="space-y-[var(--space-4)]">
-            <section className="space-y-[var(--space-2)] px-[var(--space-section-sm)] pt-[var(--space-4)] md:px-[var(--space-section-md)]">
-              <div className="space-y-[var(--space-half)]">
-                <h2 className="m-0 text-section-title">Cases</h2>
-                <p className="max-w-[var(--content-width-md)] text-[length:var(--text-meta)] leading-[var(--leading-normal)] text-[color:var(--color-text-secondary)]">
-                  A lightweight list-detail flow for browsing operational cases and opening the existing record screen.
+          <CasesListTemplate
+            actions={
+              <Button variant="primary" onClick={() => undefined}>
+                Create case
+              </Button>
+            }
+            compactFilterSpacing={activeCaseFilters.length > 0 && filteredCases.length === 0}
+            resultsRegionId="case-list-results"
+            overview={caseListSummaryItems.map((item) => (
+              <button
+                key={item.label}
+                type="button"
+                onClick={() => toggleCaseKpiFilter(item.id)}
+                aria-pressed={caseKpiFilter === item.id}
+                aria-controls="case-list-results"
+                aria-label={`${caseKpiFilter === item.id ? "Clear" : "Filter by"} ${item.label.toLowerCase()} cases`}
+                className={`group rounded-[var(--radius-md)] border px-[var(--space-4)] py-[var(--space-3)] text-left transition-[background-color,border-color,opacity] duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-focus-ring)] ${
+                  caseKpiFilter === item.id
+                    ? "border-[length:var(--border-width-control-focus)] border-[var(--color-field-border-focus)] bg-[var(--color-field-bg)]"
+                    : "border-[var(--color-border-subtle)] bg-[var(--color-surface)] hover:bg-[var(--color-surface-muted)]"
+                }`}
+              >
+                <p className={`text-[length:var(--text-meta)] leading-[var(--leading-normal)] ${
+                  caseKpiFilter === item.id
+                    ? "text-[color:var(--color-text-primary)]"
+                    : "text-[color:var(--color-text-secondary)] group-hover:text-[color:var(--color-text-primary)]"
+                }`}>
+                  {item.label}
                 </p>
-              </div>
-            </section>
-
-            <section className="grid gap-[var(--space-2)] px-[var(--space-section-sm)] md:grid-cols-2 xl:grid-cols-4 md:px-[var(--space-section-md)]">
-              {(
-                [
-                { id: "open", label: "Open", value: openCaseCount },
-                { id: "waiting_on_customer", label: "Waiting on customer", value: waitingCaseCount },
-                { id: "on_hold", label: "On hold", value: onHoldCaseCount },
-                { id: "high_priority", label: "High priority", value: highPriorityCaseCount },
-                ] satisfies typeof caseListKpiItems
-              ).map((item) => (
-                <button
-                  key={item.label}
-                  type="button"
-                  onClick={() => toggleCaseKpiFilter(item.id)}
-                  aria-pressed={caseKpiFilter === item.id}
-                  className={`rounded-[var(--radius-md)] border px-[var(--space-4)] py-[var(--space-3)] text-left transition-colors focus-visible:outline-none ${
-                    caseKpiFilter === item.id
-                      ? "border-[var(--color-border-strong)] bg-[var(--color-surface-muted)]"
-                      : "border-[var(--color-border-divider)] bg-[var(--color-surface)] hover:bg-[var(--color-surface-muted)]"
-                  }`}
-                >
-                  <p className={`text-[length:var(--text-meta)] leading-[var(--leading-normal)] ${
-                    caseKpiFilter === item.id
-                      ? "text-[color:var(--color-text-primary)]"
-                      : "text-[color:var(--color-text-secondary)]"
-                  }`}>
-                    {item.label}
-                  </p>
-                  <p className="pt-[var(--space-1)] text-xl leading-[var(--leading-snug)] text-[color:var(--color-text-primary)]">
-                    {item.value}
-                  </p>
-                </button>
-              ))}
-            </section>
-
-            <section className="space-y-[var(--space-3)] bg-[var(--color-surface)] px-[var(--space-section-sm)] py-[var(--space-4)] md:px-[var(--space-section-md)]">
+                <p className={`pt-[var(--space-1)] text-xl leading-[var(--leading-snug)] text-[color:var(--color-text-primary)] ${
+                  caseKpiFilter === item.id ? "font-medium" : "font-normal"
+                }`}>
+                  {item.value}
+                </p>
+              </button>
+            ))}
+            filterControls={
               <div className="grid gap-[var(--space-3)] md:grid-cols-[minmax(0,2fr)_minmax(12rem,0.8fr)]">
                 <Field label="Search" variant="tight">
                   <Input
@@ -993,6 +1032,8 @@ export default function App() {
                     value={caseSearch}
                     onChange={(event) => setCaseSearch(event.target.value)}
                     placeholder="Search by case, title, customer, or assignee"
+                    aria-controls="case-list-results"
+                    aria-label="Search cases"
                   />
                 </Field>
 
@@ -1001,6 +1042,8 @@ export default function App() {
                     size="sm"
                     value={caseStatusFilter}
                     onChange={(event) => setCaseStatusFilter(event.target.value as "all" | CaseRecord["status"])}
+                    aria-controls="case-list-results"
+                    aria-label="Filter cases by status"
                   >
                     <option value="all">All statuses</option>
                     {STATUS_OPTIONS.map((option) => (
@@ -1011,13 +1054,62 @@ export default function App() {
                   </Select>
                 </Field>
               </div>
+            }
+            activeFilters={activeCaseFilters.length > 0 ? (
+              <>
+                {activeCaseFilters.map((filter) => (
+                  <div
+                    key={filter.id}
+                    role="listitem"
+                    className="inline-flex items-center gap-[var(--space-2)] rounded-[var(--radius-sm)] border border-[var(--color-border-subtle)] bg-[var(--color-surface)] px-[var(--space-2)] py-[var(--space-1)] text-[length:var(--text-meta)] leading-[var(--leading-normal)] text-[color:var(--color-text-primary)] transition-[background-color,border-color,opacity] duration-150 hover:bg-[var(--color-surface-muted)]"
+                  >
+                    <span>{filter.label}</span>
+                    <button
+                      type="button"
+                      onClick={filter.clear}
+                      className="inline-flex h-[16px] w-[16px] items-center justify-center rounded-[var(--radius-sm)] text-[color:var(--color-text-muted)] transition-colors hover:text-[color:var(--color-text-secondary)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-focus-ring)]"
+                      aria-label={`Remove filter ${filter.label}`}
+                    >
+                      <svg
+                        aria-hidden="true"
+                        viewBox="0 0 12 12"
+                        className="h-[0.75rem] w-[0.75rem]"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                      >
+                        <path d="M2.5 2.5 9.5 9.5" />
+                        <path d="M9.5 2.5 2.5 9.5" />
+                      </svg>
+                    </button>
+                  </div>
+                ))}
 
-              <div className="overflow-hidden">
-                <div className="hidden grid-cols-[minmax(0,2.4fr)_minmax(10rem,1.2fr)_minmax(10rem,1fr)_minmax(8rem,0.9fr)_minmax(10rem,1fr)_minmax(9rem,0.9fr)_1.5rem] gap-[var(--space-3)] border-y border-[var(--color-border-divider)] bg-[var(--color-surface-muted)] px-[var(--space-4)] py-[var(--space-3)] md:grid">
+                {activeCaseFilters.length > 1 ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCaseKpiFilter(null)
+                      setCaseStatusFilter("all")
+                      setCaseSearch("")
+                    }}
+                    aria-controls="case-list-results"
+                    aria-label="Clear all active filters"
+                    className="rounded-[var(--radius-sm)] text-[length:var(--text-meta)] leading-[var(--leading-normal)] text-[color:var(--color-text-muted)] transition-colors hover:text-[color:var(--color-text-secondary)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-focus-ring)]"
+                  >
+                    Clear all
+                  </button>
+                ) : null}
+              </>
+            ) : undefined}
+            listContent={
+              <>
+                <div className="hidden grid-cols-[minmax(0,2.4fr)_minmax(10rem,1.2fr)_minmax(10rem,1fr)_minmax(8rem,0.9fr)_minmax(10rem,1fr)_minmax(9rem,0.9fr)_1.5rem] gap-[var(--space-3)] border-y border-[var(--color-border-divider)] bg-[var(--color-warm-175)] px-[var(--space-4)] py-[var(--space-3)] md:grid">
                   {["Case", "Customer", "Status", "Priority", "Assignee", "Updated", ""].map((label, index) => (
                     <div
                       key={`${label}-${index}`}
-                      className={`text-[length:var(--text-meta)] leading-[var(--leading-normal)] font-medium text-[color:var(--color-text-primary)] ${index === 6 ? "text-right" : ""}`}
+                      className={`text-[length:var(--text-meta)] leading-[var(--leading-normal)] font-medium text-[color:var(--color-text-secondary)] ${index === 6 ? "text-right" : ""}`}
                     >
                       {label}
                     </div>
@@ -1036,7 +1128,7 @@ export default function App() {
                           key={record.id}
                           type="button"
                           onClick={() => openCase(record.id)}
-                          className="group grid w-full cursor-pointer gap-[var(--space-2)] bg-[var(--color-surface)] px-[var(--space-4)] py-[var(--space-4)] text-left transition-colors hover:bg-[var(--color-surface-muted)] focus-visible:bg-[var(--color-surface-muted)] focus-visible:outline-none md:grid-cols-[minmax(0,2.4fr)_minmax(10rem,1.2fr)_minmax(10rem,1fr)_minmax(8rem,0.9fr)_minmax(10rem,1fr)_minmax(9rem,0.9fr)_1.5rem] md:items-center md:gap-[var(--space-3)]"
+                          className="group grid w-full cursor-pointer gap-[var(--space-2)] bg-[var(--color-surface)] px-[var(--space-4)] py-[var(--space-4)] text-left transition-[background-color,border-color,opacity] duration-100 hover:bg-[var(--color-surface-muted)] focus-visible:bg-[var(--color-surface-muted)] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--color-focus-ring)] md:grid-cols-[minmax(0,2.4fr)_minmax(10rem,1.2fr)_minmax(10rem,1fr)_minmax(8rem,0.9fr)_minmax(10rem,1fr)_minmax(9rem,0.9fr)_1.5rem] md:items-center md:gap-[var(--space-3)]"
                           aria-label={`Open case ${record.id}`}
                         >
                           <div className="min-w-0 space-y-[var(--space-half)]">
@@ -1082,13 +1174,33 @@ export default function App() {
                     })}
                   </div>
                 ) : (
-                  <div className="px-[var(--space-4)] py-[var(--space-6)] text-sm leading-normal text-[color:var(--color-text-secondary)]">
-                    No cases match the current filters.
+                  <div className="border-b border-[var(--color-border-divider)] bg-[var(--color-surface)] px-[var(--space-4)] py-[var(--space-5)]">
+                    <div className="space-y-[var(--space-3)]">
+                      <p className="text-lg leading-[var(--leading-snug)] font-medium text-[color:var(--color-text-primary)]">
+                        No cases match your filters.
+                      </p>
+                      <p className="text-[length:var(--text-meta)] leading-[var(--leading-normal)] text-[color:var(--color-text-secondary)]">
+                        Clear filters to see more cases.
+                      </p>
+                      <div className="pt-[var(--space-3)]">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => {
+                            setCaseKpiFilter(null)
+                            setCaseStatusFilter("all")
+                            setCaseSearch("")
+                          }}
+                        >
+                          Clear filters
+                        </Button>
+                      </div>
+                    </div>
                   </div>
                 )}
-              </div>
-            </section>
-          </div>
+              </>
+            }
+          />
           ) : mode === "view" ? (
           <div className="space-y-[var(--space-4)]">
             <div className="px-[var(--space-section-sm)] pt-[var(--space-4)] md:px-[var(--space-section-md)]">
@@ -1098,7 +1210,6 @@ export default function App() {
             </div>
             <RecordShellBar
               breadcrumbs={[
-                { label: "Service", href: "#" },
                 {
                   label: "Cases",
                   href: "#",
