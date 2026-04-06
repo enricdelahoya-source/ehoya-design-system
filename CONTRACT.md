@@ -40,6 +40,8 @@ Do not rely on:
 * decorative color usage
 * visual novelty for its own sake
 
+---
+
 ### 2. Semantics over hardcoded styling
 
 Prefer semantic tokens and reusable patterns over one-off values.
@@ -57,9 +59,13 @@ Prefer:
 * shared type scale
 * shared control sizing
 
+---
+
 ### 3. Consistency beats cleverness
 
 If a choice improves reuse and predictability, prefer it over something visually special.
+
+---
 
 ### 4. Enterprise clarity
 
@@ -71,6 +77,8 @@ That means:
 * actions should be easy to scan
 * labels, helper text, and status should be explicit
 * controls should feel stable and trustworthy
+
+---
 
 ### 5. Interaction through layout first
 
@@ -126,6 +134,8 @@ Later patterns:
 * status blocks
 * recommendation cards
 
+---
+
 ### Prefer extension over duplication
 
 If a new need is close to an existing primitive, first consider:
@@ -136,6 +146,8 @@ If a new need is close to an existing primitive, first consider:
 * prop
 
 Create a separate component only when the behavior or meaning is materially different.
+
+---
 
 ### Do not create duplicate variants casually
 
@@ -368,3 +380,54 @@ When there are multiple valid choices, prefer the one that is:
 * more semantic
 * more structurally clear
 * more likely to scale across ERP workflows
+
+---
+
+## Execution interpretation (for code assistants)
+
+When applying this contract:
+
+- Always prioritize local consistency over global improvement
+- Do not expand scope beyond the requested change
+- Do not “clean up” or refactor unrelated parts of the system
+- Do not introduce new patterns unless explicitly required by the task
+
+---
+
+### Scope expectations
+
+- Assume tasks are small and local by default
+- Modify only explicitly relevant files
+- Never modify more than 2 files in a single task unless explicitly instructed
+- If a change requires touching multiple components or patterns, STOP and propose a plan
+
+---
+
+### Change behavior
+
+- Prefer minimal, targeted updates over broad changes
+- Reuse existing primitives and tokens even if imperfect
+- Do not attempt to “fix the system” while solving a local issue
+- Do not rewrite entire files to achieve small changes
+
+---
+
+### Decision rule
+
+When unsure:
+
+- choose the option that introduces the least change
+- choose the option that best matches existing patterns
+- avoid inventing new solutions
+
+---
+
+### Anti-drift rule
+
+Do not:
+
+- redesign components
+- introduce stylistic variation
+- adjust unrelated spacing, colors, or structure
+
+unless explicitly instructed in the task

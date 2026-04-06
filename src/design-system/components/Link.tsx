@@ -1,4 +1,4 @@
-import type { ReactNode } from "react"
+import type { MouseEventHandler, ReactNode } from "react"
 
 /**
  * ========================================
@@ -19,6 +19,7 @@ type LinkProps = {
   children: ReactNode
   href?: string
   className?: string
+  onClick?: MouseEventHandler<HTMLAnchorElement>
 }
 
 /**
@@ -30,6 +31,7 @@ export default function Link({
   children,
   href = "#",
   className = "",
+  onClick,
 }: LinkProps) {
   /**
    * ========================================
@@ -72,7 +74,7 @@ export default function Link({
    * ========================================
    */
   return (
-    <a href={href} className={linkClasses}>
+    <a href={href} className={linkClasses} onClick={onClick}>
       {children}
     </a>
   )

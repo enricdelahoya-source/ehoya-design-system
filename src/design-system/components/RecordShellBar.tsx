@@ -1,4 +1,4 @@
-import type { ReactNode } from "react"
+import type { MouseEventHandler, ReactNode } from "react"
 import BrandStripe from "./BrandStripe"
 import CaseStatusBadge, { type CaseStatus } from "./CaseStatusBadge"
 import Link from "./Link"
@@ -22,6 +22,7 @@ import Link from "./Link"
 type RecordShellBarBreadcrumb = {
   label: string
   href: string
+  onClick?: MouseEventHandler<HTMLAnchorElement>
 }
 
 type RecordShellBarProps = {
@@ -204,13 +205,17 @@ export default function RecordShellBar({
         {showBreadcrumbs && breadcrumbs ? (
           <nav aria-label="Breadcrumb" className={breadcrumbRow}>
             {breadcrumbs.map((breadcrumb, index) => (
-              <span key={breadcrumb.href} className="inline-flex items-center gap-[var(--space-2)]">
+              <span key={`${breadcrumb.label}-${breadcrumb.href}`} className="inline-flex items-center gap-[var(--space-2)]">
                 {index > 0 ? (
                   <span aria-hidden="true" className={breadcrumbSeparatorClasses}>
                     /
                   </span>
                 ) : null}
-                <Link href={breadcrumb.href} className={breadcrumbLinkClasses}>
+                <Link
+                  href={breadcrumb.href}
+                  className={breadcrumbLinkClasses}
+                  onClick={breadcrumb.onClick}
+                >
                   {breadcrumb.label}
                 </Link>
               </span>

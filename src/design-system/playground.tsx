@@ -83,6 +83,35 @@ type SectionConfig = {
   fields: FieldConfig[]
 }
 
+type AICaseInput = {
+  caseId: string
+  title: string
+  status: string
+  priority?: string
+  sections: {
+    title: string
+    fields: {
+      label: string
+      value: string | null
+    }[]
+  }[]
+}
+
+type AIRecordInsight = {
+  summary: string[]
+  actions: string[]
+}
+
+type AICaseSignals = {
+  isEscalated: boolean
+  isWaitingOnCustomer: boolean
+  isHighPriority: boolean
+  needsApproval: boolean
+  isMigrationRelated: boolean
+  isVisibilityIssue: boolean
+  isAuthRelated: boolean
+}
+
 const INITIAL_CASE_RECORD: CaseRecord = {
   title: "Customer cannot access invoice portal",
   id: "CASE-10482",
@@ -121,6 +150,200 @@ const INITIAL_CASE_RECORD: CaseRecord = {
   callReference: "CALL-2026-04-01-1184",
   chatSessionId: "CHAT-SES-440218",
 }
+
+const EXAMPLE_CASES: CaseRecord[] = [
+  INITIAL_CASE_RECORD,
+  {
+    ...INITIAL_CASE_RECORD,
+    id: "CASE-10463",
+    title: "European clinic cannot reconcile duplicate payment confirmations in billing portal",
+    status: "In progress",
+    priority: "Critical",
+    assignee: "Jonas Weber",
+    queue: "Billing Operations",
+    statusReason: "",
+    onHoldUntil: "",
+    channel: "Portal",
+    severity: "Critical",
+    productArea: "Payments Reconciliation",
+    category: "Transactions / Duplicate confirmation records",
+    region: "Central Europe",
+    source: "Customer Self-Service Portal",
+    responseTarget: "2026-04-01 09:15 CET",
+    resolutionTarget: "2026-04-01 13:00 CET",
+    firstResponse: "2026-04-01 08:58 CET",
+    lastUpdate: "2026-04-01 11:22 CET",
+    slaStatus: "At risk",
+    breachRisk: "High",
+    customer: "Nordstern Dental Group",
+    contact: "Eva Kruger",
+    email: "eva.kruger@nordstern.example",
+    accountTier: "Enterprise",
+    contractType: "Enterprise subscription",
+    routingGroup: "Payments Escalations",
+    description:
+      "Customer reports duplicate payment confirmation emails and mismatched invoice statuses after a batch of portal-submitted payments.",
+    internalNotes:
+      "Cross-check payment gateway webhooks against billing reconciliation logs before reprocessing any invoices.",
+    emailThreadId: "",
+    callReference: "",
+    chatSessionId: "",
+  },
+  {
+    ...INITIAL_CASE_RECORD,
+    id: "CASE-10412",
+    title: "Regional operations lead requests closure confirmation for resolved access incident",
+    status: "Resolved",
+    priority: "Medium",
+    assignee: "Chiara Marino",
+    queue: "Customer Operations",
+    statusReason: "Access restored and customer notified. Waiting for formal closure acknowledgement.",
+    onHoldUntil: "",
+    channel: "Email",
+    severity: "Minor",
+    productArea: "",
+    category: "",
+    region: "Southern Europe",
+    source: "",
+    timelinePolicy: "Enterprise Standard",
+    responseTarget: "2026-03-31 14:00 CET",
+    resolutionTarget: "2026-04-01 17:00 CET",
+    firstResponse: "2026-03-31 13:42 CET",
+    lastUpdate: "2026-04-01 16:18 CET",
+    slaStatus: "On track",
+    breachRisk: "Low",
+    customer: "Clinica Sorella",
+    contact: "Paolo Vitale",
+    email: "paolo.vitale@clinicasorella.example",
+    accountTier: "Professional",
+    contractType: "Professional annual plan",
+    routingGroup: "Customer Operations",
+    approvalRequired: "No",
+    approvalReason: "",
+    description:
+      "Customer requested written confirmation that portal access was fully restored after the previous incident.",
+    internalNotes:
+      "Sparse routing metadata is intentional here to test read-only fallback handling in the record sections.",
+    emailThreadId: "THR-884140",
+    callReference: "",
+    chatSessionId: "",
+  },
+  {
+    ...INITIAL_CASE_RECORD,
+    id: "CASE-10504",
+    title: "Escalated review for multi-market invoice visibility issue affecting finance administrators across merged clinic entities after tenant migration",
+    status: "Escalated",
+    priority: "High",
+    assignee: "Amelie Laurent",
+    queue: "Platform Escalations",
+    statusReason: "Escalated to platform engineering after tenant migration logs showed inconsistent visibility scopes.",
+    onHoldUntil: "",
+    channel: "Phone",
+    severity: "Major",
+    productArea: "Tenant Administration",
+    category: "Visibility & Permissions / Cross-entity access",
+    region: "North America",
+    source: "Executive escalation hotline",
+    timelinePolicy: "Enterprise Plus - Executive Escalation",
+    responseTarget: "2026-04-01 10:00 CET",
+    resolutionTarget: "2026-04-02 12:00 CET",
+    firstResponse: "2026-04-01 09:18 CET",
+    lastUpdate: "2026-04-01 12:34 CET",
+    slaStatus: "At risk",
+    breachRisk: "High",
+    customer: "Northlake Medical Network",
+    contact: "Sofia Bennett",
+    email: "sofia.bennett@northlake.example",
+    accountTier: "Enterprise Plus",
+    contractType: "Enterprise subscription with executive escalation coverage",
+    routingGroup: "Platform Escalations",
+    approvalRequired: "Yes",
+    approvalReason: "Engineering manager approval required before running tenant visibility repair.",
+    description:
+      "Finance admins from merged entities can see only a partial subset of invoices after a tenant migration and permissions sync.",
+    internalNotes:
+      "Keep the rollback window open until visibility results are confirmed across all merged entities.",
+    emailThreadId: "",
+    callReference: "CALL-2026-04-01-1219",
+    chatSessionId: "",
+  },
+  {
+    ...INITIAL_CASE_RECORD,
+    id: "CASE-10388",
+    title: "New onboarding question about VAT labels in the invoice export",
+    status: "New",
+    priority: "",
+    assignee: "",
+    queue: "General Support",
+    statusReason: "",
+    onHoldUntil: "",
+    channel: "Chat",
+    severity: "Minor",
+    productArea: "Invoice Export",
+    category: "Configuration / Tax labels",
+    region: "Latin America",
+    source: "Live chat",
+    timelinePolicy: "Standard Support",
+    responseTarget: "2026-04-01 15:00 CET",
+    resolutionTarget: "2026-04-03 17:00 CET",
+    firstResponse: "",
+    lastUpdate: "2026-04-01 14:12 CET",
+    slaStatus: "On track",
+    breachRisk: "Low",
+    customer: "Vida Clara Centro Medico",
+    contact: "Ana Perez",
+    email: "ana.perez@vidaclara.example",
+    accountTier: "Standard",
+    contractType: "Standard monthly plan",
+    routingGroup: "General Support",
+    approvalRequired: "No",
+    approvalReason: "",
+    description:
+      "Customer wants to understand whether VAT labels in exported invoices can be renamed for a local market workflow.",
+    internalNotes:
+      "Useful sparse record to test missing owner and priority in both list and detail views.",
+    emailThreadId: "",
+    callReference: "",
+    chatSessionId: "CHAT-SES-440901",
+  },
+  {
+    ...INITIAL_CASE_RECORD,
+    id: "CASE-10495",
+    title: "Customer asked when suspended invoice reminders will resume after account verification",
+    status: "Waiting on customer",
+    priority: "Low",
+    assignee: "Lucia Fernandez",
+    queue: "Billing Communications",
+    statusReason: "Waiting for the customer to confirm the compliance contact who should receive reminder emails.",
+    onHoldUntil: "2026-04-05",
+    channel: "Email",
+    severity: "Minor",
+    productArea: "Reminder Communications",
+    category: "Notifications / Compliance recipient update",
+    region: "Southern Europe",
+    source: "Customer Support Mailbox",
+    timelinePolicy: "Standard Support",
+    responseTarget: "2026-04-01 13:30 CET",
+    resolutionTarget: "2026-04-05 17:00 CET",
+    firstResponse: "2026-04-01 13:02 CET",
+    lastUpdate: "2026-04-01 13:44 CET",
+    slaStatus: "On track",
+    breachRisk: "Low",
+    customer: "Viva la Vita Labs",
+    contact: "Irene Costa",
+    email: "irene.costa@vivalavitalabs.example",
+    accountTier: "Professional",
+    contractType: "Professional annual plan",
+    routingGroup: "Billing Communications",
+    description:
+      "Customer needs confirmation on when automated reminders restart after updating the authorized reminder recipient.",
+    internalNotes:
+      "Hold until the customer confirms the compliance contact to avoid re-enabling reminders to the wrong mailbox.",
+    emailThreadId: "THR-884302",
+    callReference: "",
+    chatSessionId: "",
+  },
+]
 
 function getSuggestedTargets(severity: CaseRecord["severity"]) {
   switch (severity) {
@@ -376,8 +599,170 @@ function getClassificationSectionConfig(
   }
 }
 
-const aiSummary =
-  "Customer appears blocked by an authentication loop after multiple password resets. Recent mail-delivery checks suggest the issue is not with the reset flow itself.\n\nAccount-state synchronization between identity services and the billing portal is the most likely cause. If confirmed, the next step is controlled account remediation rather than additional customer-driven resets."
+function buildAICaseInput(record: CaseRecord, sections: SectionConfig[]): AICaseInput {
+  const excludedTopLevelFieldLabels = new Set(["Status", "Priority"])
+
+  return {
+    caseId: record.id,
+    title: record.title,
+    status: record.status,
+    priority: record.priority || undefined,
+    sections: sections.map((section) => ({
+      title: section.title,
+      fields: section.fields
+        .filter((field) => !excludedTopLevelFieldLabels.has(field.label))
+        .map((field) => {
+          const rawValue = record[field.key]
+          const normalizedValue = rawValue.trim() ? rawValue : null
+
+          return {
+            label: field.label,
+            value: normalizedValue,
+          }
+        }),
+    })),
+  }
+}
+
+function detectAICaseSignals(input: AICaseInput): AICaseSignals {
+  const fieldEntries = input.sections.flatMap((section) => section.fields)
+  const combinedCaseText = [
+    input.title,
+    input.status,
+    input.priority ?? "",
+    ...fieldEntries.flatMap((field) => [field.label, field.value ?? ""]),
+  ]
+    .join(" ")
+    .toLowerCase()
+
+  const approvalRequiredValue = fieldEntries.find(
+    (field) => field.label === "Approval required"
+  )?.value
+
+  const hasKeyword = (keywords: string[]) =>
+    keywords.some((keyword) => combinedCaseText.includes(keyword))
+
+  return {
+    isEscalated: input.status === "Escalated",
+    isWaitingOnCustomer: input.status === "Waiting on customer",
+    isHighPriority:
+      input.priority === "High" || input.priority === "Critical",
+    needsApproval: approvalRequiredValue === "Yes",
+    isMigrationRelated: hasKeyword(["migration", "tenant", "sync"]),
+    isVisibilityIssue: hasKeyword(["visibility", "permission", "permissions", "access scope"]),
+    isAuthRelated: hasKeyword(["authentication", "identity", "password", "login", "access"]),
+  }
+}
+
+function buildFakeSummary(signals: AICaseSignals): string[] {
+  const summary: string[] = []
+
+  if (signals.isEscalated) {
+    summary.push("The case shows escalation signals.")
+  } else if (signals.isWaitingOnCustomer) {
+    summary.push("The case is currently blocked on customer input.")
+  } else if (signals.isHighPriority) {
+    summary.push("The case carries elevated operational priority.")
+  } else {
+    summary.push("The case is active and still needs operational review.")
+  }
+
+  if (signals.isMigrationRelated && signals.isVisibilityIssue) {
+    summary.push("Likely cause: migration or permissions drift is affecting visibility.")
+  } else if (signals.isAuthRelated) {
+    summary.push("Likely cause: identity or access state is out of sync.")
+  } else if (signals.isMigrationRelated) {
+    summary.push("Likely cause: migration or tenant-state mismatch.")
+  } else if (signals.isVisibilityIssue) {
+    summary.push("Likely cause: visibility scope or permissions are misaligned.")
+  } else {
+    summary.push("Likely cause: the current case record still points to an unresolved workflow issue.")
+  }
+
+  if (signals.needsApproval) {
+    summary.push("Approval may be required before repair or customer-impacting action.")
+  }
+
+  if (signals.isWaitingOnCustomer) {
+    summary.push("Progress is likely to remain limited until the customer responds.")
+  } else if (signals.isHighPriority) {
+    summary.push("Current case details suggest the issue should stay in active ownership.")
+  } else {
+    summary.push("Current case details suggest the next step is controlled follow-up.")
+  }
+
+  return summary.slice(0, 4)
+}
+
+function buildFakeActions(signals: AICaseSignals, aiVersion: number): string[] {
+  const actions: string[] = []
+
+  if (signals.isMigrationRelated) {
+    actions.push("Review migration logs.")
+  }
+
+  if (signals.isVisibilityIssue) {
+    actions.push("Validate visibility scope by entity.")
+  }
+
+  if (signals.isAuthRelated) {
+    actions.push("Compare identity and access records.")
+  }
+
+  if (signals.needsApproval) {
+    actions.push("Review approval path before repair.")
+  }
+
+  if (signals.isWaitingOnCustomer) {
+    actions.push("Request customer confirmation.")
+  }
+
+  if (signals.isEscalated) {
+    actions.push("Maintain engineering ownership.")
+  }
+
+  if (signals.isHighPriority && !signals.isEscalated) {
+    actions.push("Send a customer update.")
+  }
+
+  const genericActions = [
+    "Update case notes.",
+    "Capture current findings.",
+  ]
+
+  actions.push(genericActions[aiVersion % genericActions.length])
+
+  return Array.from(new Set(actions)).slice(0, 4)
+}
+
+function formatAIUpdatedLabel(updatedAt: number) {
+  const diffInMinutes = Math.floor((Date.now() - updatedAt) / (1000 * 60))
+
+  if (diffInMinutes <= 0) {
+    return "Updated just now"
+  }
+
+  if (diffInMinutes === 1) {
+    return "Updated 1 minute ago"
+  }
+
+  if (diffInMinutes < 60) {
+    return `Updated ${diffInMinutes} minutes ago`
+  }
+
+  return `Updated ${new Date(updatedAt).toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  })}`
+}
+
+function getFakeAIRecordInsight(input: AICaseInput, aiVersion: number): AIRecordInsight {
+  const signals = detectAICaseSignals(input)
+  return {
+    summary: buildFakeSummary(signals),
+    actions: buildFakeActions(signals, aiVersion),
+  }
+}
 
 const recentActivity = [
   {
@@ -480,11 +865,131 @@ const asideTitleStyles = {
   color: "var(--color-text-primary)",
 } as const
 
+function getPriorityDisplay(priority: CaseRecord["priority"]) {
+  switch (priority) {
+    case "Critical":
+      return {
+        label: "Critical 4",
+        className: "text-[color:var(--color-text-primary)]",
+      }
+    case "High":
+      return {
+        label: "High 3",
+        className: "text-[color:var(--color-text-primary)]",
+      }
+    case "Medium":
+      return {
+        label: "Medium 2",
+        className: "text-[color:var(--color-text-primary)]",
+      }
+    case "Low":
+      return {
+        label: "Low 1",
+        className: "text-[color:var(--color-text-primary)]",
+      }
+    case "":
+    default:
+      return {
+        label: "Not set 0",
+        className: "text-[color:var(--color-text-primary)]",
+      }
+  }
+}
+
+function getCaseListStatusDisplay(status: CaseRecord["status"]) {
+  switch (status) {
+    case "Escalated":
+      return {
+        label: status,
+        className: "text-[color:var(--color-status-escalated)]",
+      }
+    case "Waiting on customer":
+      return {
+        label: status,
+        className: "text-[color:var(--color-status-waiting)]",
+      }
+    case "Resolved":
+      return {
+        label: status,
+        className: "text-[color:var(--color-status-resolved)]",
+      }
+    case "New":
+      return {
+        label: status,
+        className: "text-[color:var(--color-status-new)]",
+      }
+    case "In progress":
+    default:
+      return {
+        label: status,
+        className: "text-[color:var(--color-status-in-progress)]",
+      }
+  }
+}
+
+function formatCaseListUpdated(value: string) {
+  const trimmed = value.trim()
+
+  if (!trimmed) {
+    return {
+      primary: "—",
+      secondary: undefined,
+    }
+  }
+
+  const [datePart, ...timeParts] = trimmed.split(" ")
+
+  if (!datePart) {
+    return {
+      primary: trimmed,
+      secondary: undefined,
+    }
+  }
+
+  const parsedDate = new Date(`${datePart}T00:00:00`)
+
+  if (Number.isNaN(parsedDate.getTime())) {
+    return {
+      primary: trimmed,
+      secondary: undefined,
+    }
+  }
+
+  const today = new Date()
+  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+  const diffInDays = Math.round(
+    (todayStart.getTime() - parsedDate.getTime()) / (1000 * 60 * 60 * 24)
+  )
+
+  const primary =
+    diffInDays === 0
+      ? "Today"
+      : diffInDays === 1
+        ? "Yesterday"
+        : parsedDate.toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+          })
+
+  const secondary = timeParts.join(" ").trim() || parsedDate.getFullYear().toString()
+
+  return {
+    primary,
+    secondary,
+  }
+}
+
 export default function App() {
   const [playgroundView, setPlaygroundView] = useState<"screen" | "components">("screen")
+  const [screenView, setScreenView] = useState<"list" | "record">("list")
   const [mode, setMode] = useState<"view" | "edit">("view")
-  const [savedRecord, setSavedRecord] = useState(INITIAL_CASE_RECORD)
-  const [draftRecord, setDraftRecord] = useState(INITIAL_CASE_RECORD)
+  const [cases, setCases] = useState(EXAMPLE_CASES)
+  const [selectedCaseId, setSelectedCaseId] = useState(EXAMPLE_CASES[0]?.id ?? "")
+  const [draftRecord, setDraftRecord] = useState(EXAMPLE_CASES[0] ?? INITIAL_CASE_RECORD)
+  const [caseSearch, setCaseSearch] = useState("")
+  const [caseStatusFilter, setCaseStatusFilter] = useState<"all" | CaseRecord["status"]>("all")
+  const [aiVersion, setAiVersion] = useState(1)
+  const [aiUpdatedAt, setAiUpdatedAt] = useState(() => Date.now())
   const [responseTargetEdited, setResponseTargetEdited] = useState(false)
   const [resolutionTargetEdited, setResolutionTargetEdited] = useState(false)
   const [touched, setTouched] = useState({
@@ -492,6 +997,10 @@ export default function App() {
     priority: false,
   })
   const [saveAttempted, setSaveAttempted] = useState(false)
+  const savedRecord =
+    cases.find((record) => record.id === selectedCaseId) ??
+    cases[0] ??
+    INITIAL_CASE_RECORD
 
   const hasUnsavedChanges =
     JSON.stringify(savedRecord) !== JSON.stringify(draftRecord)
@@ -519,6 +1028,32 @@ export default function App() {
     handleChannelChange,
     handleSeverityChange
   )
+  const aiSourceSections = [
+    viewStatusOwnershipSection,
+    viewClassificationSection,
+  ]
+  const aiCaseInput = buildAICaseInput(savedRecord, aiSourceSections)
+  const aiRecordInsight = getFakeAIRecordInsight(aiCaseInput, aiVersion)
+  const aiUpdatedLabel = formatAIUpdatedLabel(aiUpdatedAt)
+  const openCaseCount = cases.filter((record) => record.status !== "Resolved").length
+  const waitingCaseCount = cases.filter((record) => record.status === "Waiting on customer").length
+  const onHoldCaseCount = cases.filter((record) => Boolean(record.onHoldUntil)).length
+  const highPriorityCaseCount = cases.filter(
+    (record) => record.priority === "High" || record.priority === "Critical"
+  ).length
+  const filteredCases = cases.filter((record) => {
+    const matchesSearch =
+      caseSearch.trim() === "" ||
+      [record.id, record.title, record.customer, record.assignee]
+        .join(" ")
+        .toLowerCase()
+        .includes(caseSearch.trim().toLowerCase())
+
+    const matchesStatus =
+      caseStatusFilter === "all" || record.status === caseStatusFilter
+
+    return matchesSearch && matchesStatus
+  })
 
   function resetEditState(nextDraft: CaseRecord) {
     setDraftRecord(nextDraft)
@@ -531,9 +1066,28 @@ export default function App() {
     setSaveAttempted(false)
   }
 
+  function refreshAIInsights() {
+    setAiVersion((current) => current + 1)
+    setAiUpdatedAt(Date.now())
+  }
+
   function enterEditMode() {
     resetEditState(savedRecord)
     setMode("edit")
+  }
+
+  function openCase(caseId: string) {
+    const nextCase = cases.find((record) => record.id === caseId)
+
+    if (!nextCase) {
+      return
+    }
+
+    setSelectedCaseId(caseId)
+    resetEditState(nextCase)
+    setMode("view")
+    setScreenView("record")
+    refreshAIInsights()
   }
 
   function markTouched(field: "title" | "priority") {
@@ -572,6 +1126,21 @@ export default function App() {
     updateDraft("channel", nextChannel)
   }
 
+  function handleBackToCases() {
+    if (mode === "edit" && hasUnsavedChanges) {
+      const confirmed = window.confirm("Discard unsaved changes and return to the cases list?")
+
+      if (!confirmed) {
+        return
+      }
+
+      resetEditState(savedRecord)
+      setMode("view")
+    }
+
+    setScreenView("list")
+  }
+
   function handleCancel() {
     if (hasUnsavedChanges) {
       const confirmed = window.confirm("Discard unsaved changes?")
@@ -597,9 +1166,14 @@ export default function App() {
       return
     }
 
-    setSavedRecord(draftRecord)
+    setCases((currentCases) =>
+      currentCases.map((record) => (
+        record.id === savedRecord.id ? draftRecord : record
+      ))
+    )
     resetEditState(draftRecord)
     setMode("view")
+    refreshAIInsights()
   }
 
   function renderSectionField(
@@ -741,12 +1315,159 @@ export default function App() {
           </div>
 
         {playgroundView === "screen" ? (
-          mode === "view" ? (
+          screenView === "list" ? (
           <div className="space-y-[var(--space-4)]">
+            <section className="space-y-[var(--space-2)] px-[var(--space-section-sm)] pt-[var(--space-4)] md:px-[var(--space-section-md)]">
+              <div className="space-y-[var(--space-half)]">
+                <h2 className="m-0 text-section-title">Cases</h2>
+                <p className="max-w-[var(--content-width-md)] text-[length:var(--text-meta)] leading-[var(--leading-normal)] text-[color:var(--color-text-secondary)]">
+                  A lightweight list-detail flow for browsing operational cases and opening the existing record screen.
+                </p>
+              </div>
+            </section>
+
+            <section className="grid gap-[var(--space-2)] px-[var(--space-section-sm)] md:grid-cols-2 xl:grid-cols-4 md:px-[var(--space-section-md)]">
+              {[
+                { label: "Open", value: openCaseCount },
+                { label: "Waiting on customer", value: waitingCaseCount },
+                { label: "On hold", value: onHoldCaseCount },
+                { label: "High priority", value: highPriorityCaseCount },
+              ].map((item) => (
+                <div
+                  key={item.label}
+                  className="rounded-[var(--radius-md)] border border-[var(--color-border-divider)] bg-[var(--color-surface)] px-[var(--space-4)] py-[var(--space-3)]"
+                >
+                  <p className="text-[length:var(--text-meta)] leading-[var(--leading-normal)] text-[color:var(--color-text-secondary)]">
+                    {item.label}
+                  </p>
+                  <p className="pt-[var(--space-1)] text-xl leading-[var(--leading-snug)] text-[color:var(--color-text-primary)]">
+                    {item.value}
+                  </p>
+                </div>
+              ))}
+            </section>
+
+            <section className="space-y-[var(--space-3)] bg-[var(--color-surface)] px-[var(--space-section-sm)] py-[var(--space-4)] md:px-[var(--space-section-md)]">
+              <div className="grid gap-[var(--space-3)] md:grid-cols-[minmax(0,2fr)_minmax(12rem,0.8fr)]">
+                <Field label="Search" variant="tight">
+                  <Input
+                    size="sm"
+                    value={caseSearch}
+                    onChange={(event) => setCaseSearch(event.target.value)}
+                    placeholder="Search by case, title, customer, or assignee"
+                  />
+                </Field>
+
+                <Field label="Status" variant="tight">
+                  <Select
+                    size="sm"
+                    value={caseStatusFilter}
+                    onChange={(event) => setCaseStatusFilter(event.target.value as "all" | CaseRecord["status"])}
+                  >
+                    <option value="all">All statuses</option>
+                    {STATUS_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+              </div>
+
+              <div className="overflow-hidden">
+                <div className="hidden grid-cols-[minmax(0,2.4fr)_minmax(10rem,1.2fr)_minmax(10rem,1fr)_minmax(8rem,0.9fr)_minmax(10rem,1fr)_minmax(9rem,0.9fr)_1.5rem] gap-[var(--space-3)] bg-[var(--color-surface-muted)] px-[var(--space-4)] py-[var(--space-3)] md:grid">
+                  {["Case", "Customer", "Status", "Priority", "Assignee", "Updated", ""].map((label, index) => (
+                    <div
+                      key={`${label}-${index}`}
+                      className={`text-[length:var(--text-meta)] leading-[var(--leading-normal)] text-[color:var(--color-text-secondary)] ${index === 6 ? "text-right" : ""}`}
+                    >
+                      {label}
+                    </div>
+                  ))}
+                </div>
+
+                {filteredCases.length > 0 ? (
+                  <div className="divide-y divide-[var(--color-border-divider)]">
+                    {filteredCases.map((record) => {
+                      const priorityDisplay = getPriorityDisplay(record.priority)
+                      const statusDisplay = getCaseListStatusDisplay(record.status)
+                      const updatedDisplay = formatCaseListUpdated(record.lastUpdate)
+
+                      return (
+                        <button
+                          key={record.id}
+                          type="button"
+                          onClick={() => openCase(record.id)}
+                          className="group grid w-full cursor-pointer gap-[var(--space-2)] bg-[var(--color-surface)] px-[var(--space-4)] py-[var(--space-4)] text-left transition-colors hover:bg-[var(--color-surface-muted)] focus-visible:bg-[var(--color-surface-muted)] focus-visible:outline-none md:grid-cols-[minmax(0,2.4fr)_minmax(10rem,1.2fr)_minmax(10rem,1fr)_minmax(8rem,0.9fr)_minmax(10rem,1fr)_minmax(9rem,0.9fr)_1.5rem] md:items-center md:gap-[var(--space-3)]"
+                        >
+                          <div className="min-w-0 space-y-[var(--space-half)]">
+                            <p className="text-[length:var(--text-meta)] leading-[var(--leading-normal)] text-[color:var(--color-text-secondary)] transition-colors group-hover:text-[color:var(--color-text-primary)] group-focus-visible:text-[color:var(--color-text-primary)]">
+                              {record.id}
+                            </p>
+                            <div className="flex min-w-0 items-start justify-between gap-[var(--space-2)]">
+                              <p className="min-w-0 text-sm leading-normal text-[color:var(--color-text-primary)] transition-colors group-hover:text-[color:var(--color-text-brand)] group-focus-visible:text-[color:var(--color-text-brand)]">
+                                {record.title}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="min-w-0 text-sm leading-normal text-[color:var(--color-text-primary)]">
+                            {getDisplayValue(record.customer)}
+                          </div>
+                          <div className={`text-sm leading-normal ${statusDisplay.className}`}>
+                            {statusDisplay.label}
+                          </div>
+                          <div className={`text-sm leading-normal ${priorityDisplay.className}`}>
+                            {priorityDisplay.label}
+                          </div>
+                          <div className="min-w-0 text-sm leading-normal text-[color:var(--color-text-primary)]">
+                            {getDisplayValue(record.assignee)}
+                          </div>
+                          <div className="space-y-[var(--space-half)]">
+                            <p className="text-sm leading-[var(--leading-normal)] text-[color:var(--color-text-secondary)]">
+                              {updatedDisplay.primary}
+                            </p>
+                            {updatedDisplay.secondary ? (
+                              <p className="text-[length:var(--text-meta)] leading-[var(--leading-normal)] text-[color:var(--color-text-muted)]">
+                                {updatedDisplay.secondary}
+                              </p>
+                            ) : null}
+                          </div>
+                          <div className="hidden text-right md:block">
+                            <span
+                              aria-hidden="true"
+                              className="inline-block h-[0.5rem] w-[0.5rem] -rotate-45 border-r-2 border-b-2 border-[color:var(--color-text-muted)] transition-colors group-hover:border-[color:var(--color-text-secondary)] group-focus-visible:border-[color:var(--color-text-secondary)]"
+                            />
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <div className="px-[var(--space-4)] py-[var(--space-6)] text-sm leading-normal text-[color:var(--color-text-secondary)]">
+                    No cases match the current filters.
+                  </div>
+                )}
+              </div>
+            </section>
+          </div>
+          ) : mode === "view" ? (
+          <div className="space-y-[var(--space-4)]">
+            <div className="px-[var(--space-section-sm)] pt-[var(--space-4)] md:px-[var(--space-section-md)]">
+              <Button type="button" variant="ghost" onClick={handleBackToCases}>
+                Back to cases
+              </Button>
+            </div>
             <RecordShellBar
               breadcrumbs={[
-                { label: "Case management", href: "#" },
-                { label: "Cases", href: "#" },
+                { label: "Service", href: "#" },
+                {
+                  label: "Cases",
+                  href: "#",
+                  onClick: (event) => {
+                    event.preventDefault()
+                    handleBackToCases()
+                  },
+                },
               ]}
               title={savedRecord.title}
               recordId={savedRecord.id}
@@ -940,32 +1661,50 @@ export default function App() {
 
               <aside className="min-w-0 space-y-[var(--space-5)] border-t border-[var(--color-border-divider)] pt-[var(--space-6)] xl:border-t-0 xl:pt-0 xl:pl-[var(--space-section-sm)]">
                 <section className="space-y-[var(--space-2)]">
+                  <div className="flex items-center justify-between gap-[var(--space-3)]">
+                    <p className="text-[length:var(--text-xs)] leading-[var(--leading-normal)] text-[color:var(--color-text-muted)]">
+                      {aiUpdatedLabel}
+                    </p>
+                    <Link
+                      href="#"
+                      className="text-[length:var(--text-xs)] leading-[var(--leading-normal)] text-[color:var(--color-text-secondary)] hover:text-[color:var(--color-text-primary)]"
+                      onClick={(event) => {
+                        event.preventDefault()
+                        refreshAIInsights()
+                      }}
+                    >
+                      Refresh summary
+                    </Link>
+                  </div>
                   <h3 className="m-0" style={asideTitleStyles}>
                     Summary
                   </h3>
-                  <p className="whitespace-pre-wrap text-sm leading-normal text-[color:var(--color-text-primary)]">
-                    {aiSummary}
+                  <p className="text-[length:var(--text-xs)] leading-[var(--leading-normal)] text-[color:var(--color-text-muted)]">
+                    Generated from visible case details and recent activity.
                   </p>
+                  <ul className="list-outside list-disc space-y-[var(--space-1)] pt-[var(--space-1)] pl-[var(--space-4)] marker:text-[color:var(--color-text-secondary)]">
+                    {aiRecordInsight.summary.map((item) => (
+                      <li key={item} className="text-sm leading-normal text-[color:var(--color-text-primary)]">
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
                 </section>
 
                 <section className="space-y-[var(--space-2)]">
                   <h3 className="m-0" style={asideTitleStyles}>
                     Suggested actions
                   </h3>
-                  <div className="flex flex-col items-start gap-[var(--space-2)] py-[var(--space-1)]">
-                    <Button className="w-full justify-start" variant="secondary">
-                      Review account state
-                    </Button>
-                    <Link className="text-sm leading-normal" href="#">
-                      Send update
-                    </Link>
-                    <Link className="text-sm leading-normal" href="#">
-                      Escalate to IAM
-                    </Link>
-                    <Link className="text-sm leading-normal" href="#">
-                      Check tenant sync logs
-                    </Link>
-                  </div>
+                  <p className="text-[length:var(--text-xs)] leading-[var(--leading-normal)] text-[color:var(--color-text-muted)]">
+                    Suggested next steps. Review before action.
+                  </p>
+                  <ol className="list-outside list-decimal space-y-[var(--space-2)] pt-[var(--space-1)] pl-[var(--space-4)] marker:text-[color:var(--color-text-secondary)]">
+                    {aiRecordInsight.actions.map((action) => (
+                      <li key={action} className="text-sm leading-normal text-[color:var(--color-text-primary)]">
+                        {action}
+                      </li>
+                    ))}
+                  </ol>
                 </section>
 
                 <section className="space-y-[var(--space-2)]">
@@ -991,6 +1730,11 @@ export default function App() {
           </div>
         ) : (
           <div className="space-y-[var(--space-4)]">
+            <div className="px-[var(--space-section-sm)] pt-[var(--space-4)] md:px-[var(--space-section-md)]">
+              <Button type="button" variant="ghost" onClick={handleBackToCases}>
+                Back to cases
+              </Button>
+            </div>
             <RecordShellBar
               title={draftRecord.title || "Untitled case"}
               mode="edit"

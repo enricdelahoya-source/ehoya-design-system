@@ -21,4 +21,10 @@
   --color-text-danger: var(--color-red-600);
   --color-text-success: var(--color-green-800);
   --color-text-warning: var(--color-amber-800);
+
+  --color-status-new: var(--color-text-secondary);
+  --color-status-in-progress: var(--color-blue-700);
+  --color-status-waiting: var(--color-amber-800);
+  --color-status-escalated: var(--color-red-600);
+  --color-status-resolved: var(--color-green-800);
 }
