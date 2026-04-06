@@ -1,15 +1,15 @@
 import { useState } from "react"
+import { renderCaseRecordSection } from "./case-record/renderers"
+import { getCaseRecordSections, STATUS_OPTIONS } from "./case-record/schema"
+import type { CaseRecord, SectionConfig } from "./case-record/types"
 import Button from "./components/Button"
 import CaseStatusBadge, { type CaseStatus } from "./components/CaseStatusBadge"
 import Input from "./components/controls/Input"
-import ReadOnlyValue, { type ReadOnlyValueBehavior } from "./components/controls/ReadOnlyValue"
+import ReadOnlyValue from "./components/controls/ReadOnlyValue"
 import Select from "./components/controls/Select"
-import Textarea from "./components/controls/Textarea"
-import DisplayField from "./components/fields/DisplayField"
 import Field from "./components/fields/Field"
 import FieldGroupStack from "./components/field-groups/FieldGroupStack"
 import FormFieldGrid from "./components/field-groups/FormFieldGrid"
-import RecordFieldGrid from "./components/field-groups/RecordFieldGrid"
 import Link from "./components/Link"
 import FormPageLayout from "./components/layouts/FormPageLayout"
 import PageContent from "./components/PageContent"
@@ -18,70 +18,6 @@ import RecordSection from "./components/sections/RecordSection"
 import RecordShellBar from "./components/RecordShellBar"
 import StatusBadge from "./components/StatusBadge"
 import Tabs from "./components/Tabs"
-
-type CaseRecord = {
-  title: string
-  id: string
-  status: "New" | "In progress" | "Waiting on customer" | "Escalated" | "Resolved"
-  priority: "" | "Low" | "Medium" | "High" | "Critical"
-  assignee: string
-  queue: string
-  statusReason: string
-  onHoldUntil: string
-  channel: "Email" | "Phone" | "Portal" | "Chat"
-  severity: "Minor" | "Major" | "Critical"
-  productArea: string
-  category: string
-  region: "Southern Europe" | "Central Europe" | "North America" | "Latin America"
-  source: string
-  timelinePolicy: string
-  responseTarget: string
-  resolutionTarget: string
-  firstResponse: string
-  lastUpdate: string
-  slaStatus: "On track" | "At risk" | "Breached"
-  breachRisk: "Low" | "Medium" | "High"
-  customer: string
-  contact: string
-  email: string
-  accountTier: string
-  contractType: string
-  routingGroup: string
-  approvalRequired: "No" | "Yes"
-  approvalReason: string
-  description: string
-  internalNotes: string
-  emailThreadId: string
-  callReference: string
-  chatSessionId: string
-}
-
-type FieldOption = {
-  value: string
-  label: string
-}
-
-type FieldConfig = {
-  key: keyof CaseRecord
-  label: string
-  type: "text" | "textarea" | "select"
-  span?: 1 | 2
-  editable?: boolean
-  options?: FieldOption[]
-  required?: boolean
-  inputType?: "text" | "date"
-  displayBehavior?: ReadOnlyValueBehavior
-  error?: string
-  onChange?: (value: string) => void
-  onBlur?: () => void
-}
-
-type SectionConfig = {
-  id: string
-  title: string
-  description?: string
-  fields: FieldConfig[]
-}
 
 type AICaseInput = {
   caseId: string
@@ -111,6 +47,12 @@ type AICaseSignals = {
   isVisibilityIssue: boolean
   isAuthRelated: boolean
 }
+
+type CaseListKpiFilter =
+  | "open"
+  | "waiting_on_customer"
+  | "on_hold"
+  | "high_priority"
 
 const INITIAL_CASE_RECORD: CaseRecord = {
   title: "Customer cannot access invoice portal",
@@ -366,20 +308,6 @@ function getSuggestedTargets(severity: CaseRecord["severity"]) {
   }
 }
 
-function getChannelReferenceLabel(channel: CaseRecord["channel"]) {
-  switch (channel) {
-    case "Phone":
-      return "Call reference"
-    case "Chat":
-      return "Chat session ID"
-    case "Email":
-      return "Email thread ID"
-    case "Portal":
-    default:
-      return null
-  }
-}
-
 function getShellStatus(status: CaseRecord["status"]): CaseStatus {
   switch (status) {
     case "New":
@@ -396,207 +324,8 @@ function getShellStatus(status: CaseRecord["status"]): CaseStatus {
   }
 }
 
-function shouldShowStatusReason(status: CaseRecord["status"]) {
-  return status === "Waiting on customer" || status === "Escalated" || status === "Resolved"
-}
-
-function shouldShowOnHoldUntil(status: CaseRecord["status"]) {
-  return status === "Waiting on customer"
-}
-
 function getDisplayValue(value: string) {
   return value.trim() ? value : "—"
-}
-
-const STATUS_OPTIONS: FieldOption[] = [
-  { value: "New", label: "New" },
-  { value: "In progress", label: "In progress" },
-  { value: "Waiting on customer", label: "Waiting on customer" },
-  { value: "Escalated", label: "Escalated" },
-  { value: "Resolved", label: "Resolved" },
-]
-
-const PRIORITY_OPTIONS: FieldOption[] = [
-  { value: "", label: "Select priority" },
-  { value: "Low", label: "Low" },
-  { value: "Medium", label: "Medium" },
-  { value: "High", label: "High" },
-  { value: "Critical", label: "Critical" },
-]
-
-const CHANNEL_OPTIONS: FieldOption[] = [
-  { value: "Email", label: "Email" },
-  { value: "Phone", label: "Phone" },
-  { value: "Portal", label: "Portal" },
-  { value: "Chat", label: "Chat" },
-]
-
-const SEVERITY_OPTIONS: FieldOption[] = [
-  { value: "Minor", label: "Minor" },
-  { value: "Major", label: "Major" },
-  { value: "Critical", label: "Critical" },
-]
-
-const REGION_OPTIONS: FieldOption[] = [
-  { value: "Southern Europe", label: "Southern Europe" },
-  { value: "Central Europe", label: "Central Europe" },
-  { value: "North America", label: "North America" },
-  { value: "Latin America", label: "Latin America" },
-]
-
-function getStatusOwnershipSectionConfig(
-  record: CaseRecord,
-  visiblePriorityError?: string,
-  markPriorityTouched?: () => void,
-  onStatusChange?: (value: CaseRecord["status"]) => void,
-  onFieldChange?: <K extends keyof CaseRecord>(field: K, value: CaseRecord[K]) => void
-): SectionConfig {
-  const updateField = onFieldChange ?? (() => {})
-
-  return {
-    id: "status-ownership",
-    title: "Status & ownership",
-    description: "Current operational state, ownership, and hold information for the case.",
-    fields: [
-      {
-        key: "status",
-        label: "Status",
-        type: "select",
-        options: STATUS_OPTIONS,
-        onChange: onStatusChange
-          ? (value) => onStatusChange(value as CaseRecord["status"])
-          : undefined,
-      },
-      {
-        key: "priority",
-        label: "Priority",
-        type: "select",
-        options: PRIORITY_OPTIONS,
-        required: true,
-        error: visiblePriorityError,
-        onBlur: markPriorityTouched,
-        onChange: (value) => updateField("priority", value as CaseRecord["priority"]),
-      },
-      {
-        key: "assignee",
-        label: "Assignee",
-        type: "text",
-      },
-      {
-        key: "queue",
-        label: "Queue",
-        type: "text",
-        displayBehavior: "flexible",
-      },
-      ...(
-        shouldShowStatusReason(record.status)
-          ? [
-              {
-                key: "statusReason",
-                label: "Status reason",
-                type: "text",
-                span: 2,
-                displayBehavior: "flexible",
-              },
-            ]
-          : []
-      ) as FieldConfig[],
-      ...(
-        shouldShowOnHoldUntil(record.status)
-          ? [
-              {
-                key: "onHoldUntil",
-                label: "On hold until",
-                type: "text",
-                inputType: "date",
-              },
-            ]
-          : []
-      ) as FieldConfig[],
-    ],
-  }
-}
-
-function getClassificationSectionConfig(
-  record: CaseRecord,
-  renderMode: "view" | "edit",
-  onChannelChange?: (value: CaseRecord["channel"]) => void,
-  onSeverityChange?: (value: CaseRecord["severity"]) => void
-): SectionConfig {
-  const channelReferenceLabel = getChannelReferenceLabel(record.channel)
-  const editSpan = renderMode === "edit" ? 2 : undefined
-  const channelReferenceField: FieldConfig[] = channelReferenceLabel
-    ? [
-        {
-          key:
-            record.channel === "Email"
-              ? "emailThreadId"
-              : record.channel === "Phone"
-                ? "callReference"
-                : "chatSessionId",
-          label: channelReferenceLabel,
-          type: "text",
-          span: editSpan,
-          displayBehavior: "flexible",
-        },
-      ]
-    : []
-
-  return {
-    id: "classification",
-    title: "Classification",
-    description:
-      renderMode === "view"
-        ? "Categorization details used to route, report, and triage the case."
-        : "Routing and reporting fields that classify the case.",
-    fields: [
-      {
-        key: "channel",
-        label: "Channel",
-        type: "select",
-        options: CHANNEL_OPTIONS,
-        onChange: onChannelChange
-          ? (value) => onChannelChange(value as CaseRecord["channel"])
-          : undefined,
-      },
-      {
-        key: "severity",
-        label: "Severity",
-        type: "select",
-        options: SEVERITY_OPTIONS,
-        onChange: onSeverityChange
-          ? (value) => onSeverityChange(value as CaseRecord["severity"])
-          : undefined,
-      },
-      {
-        key: "region",
-        label: "Region",
-        type: "select",
-        options: REGION_OPTIONS,
-      },
-      {
-        key: "source",
-        label: "Source",
-        type: "text",
-        displayBehavior: "flexible",
-      },
-      {
-        key: "productArea",
-        label: "Product area",
-        type: "text",
-        span: editSpan,
-        displayBehavior: "flexible",
-      },
-      {
-        key: "category",
-        label: "Category",
-        type: "text",
-        span: editSpan,
-        displayBehavior: "flexible",
-      },
-      ...channelReferenceField,
-    ],
-  }
 }
 
 function buildAICaseInput(record: CaseRecord, sections: SectionConfig[]): AICaseInput {
@@ -812,6 +541,12 @@ const semanticTypeSpecimens = [
   { label: "Shell bar dirty", sample: "Unsaved changes", style: { fontSize: "var(--text-shellbar-dirty)", lineHeight: "var(--leading-shellbar-dirty)", fontWeight: "var(--font-weight-regular)", color: "var(--color-text-shellbar-dirty)" } },
 ] as const
 
+const caseListKpiItems: {
+  id: CaseListKpiFilter
+  label: string
+  value: number
+}[] = []
+
 const surfaceColorSpecimens = [
   { label: "Page", token: "--color-page", swatch: "var(--color-page)", text: "var(--color-text-primary)", sample: "Page background" },
   { label: "Surface", token: "--color-surface", swatch: "var(--color-surface)", text: "var(--color-text-primary)", sample: "Default surface" },
@@ -869,28 +604,28 @@ function getPriorityDisplay(priority: CaseRecord["priority"]) {
   switch (priority) {
     case "Critical":
       return {
-        label: "Critical 4",
+        label: "P4 Critical",
         className: "text-[color:var(--color-text-primary)]",
       }
     case "High":
       return {
-        label: "High 3",
+        label: "P3 High",
         className: "text-[color:var(--color-text-primary)]",
       }
     case "Medium":
       return {
-        label: "Medium 2",
+        label: "P2 Medium",
         className: "text-[color:var(--color-text-primary)]",
       }
     case "Low":
       return {
-        label: "Low 1",
+        label: "P1 Low",
         className: "text-[color:var(--color-text-primary)]",
       }
     case "":
     default:
       return {
-        label: "Not set 0",
+        label: "P0 Not set",
         className: "text-[color:var(--color-text-primary)]",
       }
   }
@@ -988,6 +723,7 @@ export default function App() {
   const [draftRecord, setDraftRecord] = useState(EXAMPLE_CASES[0] ?? INITIAL_CASE_RECORD)
   const [caseSearch, setCaseSearch] = useState("")
   const [caseStatusFilter, setCaseStatusFilter] = useState<"all" | CaseRecord["status"]>("all")
+  const [caseKpiFilter, setCaseKpiFilter] = useState<CaseListKpiFilter | null>(null)
   const [aiVersion, setAiVersion] = useState(1)
   const [aiUpdatedAt, setAiUpdatedAt] = useState(() => Date.now())
   const [responseTargetEdited, setResponseTargetEdited] = useState(false)
@@ -1013,25 +749,22 @@ export default function App() {
   const visiblePriorityError =
     touched.priority || saveAttempted ? priorityError : undefined
 
-  const viewStatusOwnershipSection = getStatusOwnershipSectionConfig(savedRecord)
-  const editStatusOwnershipSection = getStatusOwnershipSectionConfig(
-    draftRecord,
+  const viewRecordSections = getCaseRecordSections(savedRecord)
+  const editRecordSections = getCaseRecordSections(draftRecord, {
+    visibleTitleError,
     visiblePriorityError,
-    () => markTouched("priority"),
-    handleStatusChange,
-    updateDraft
+    markTitleTouched: () => markTouched("title"),
+    markPriorityTouched: () => markTouched("priority"),
+    onStatusChange: handleStatusChange,
+    onChannelChange: handleChannelChange,
+    onSeverityChange: handleSeverityChange,
+    onFieldChange: updateDraft,
+    onResponseTargetEdit: () => setResponseTargetEdited(true),
+    onResolutionTargetEdit: () => setResolutionTargetEdited(true),
+  })
+  const aiSourceSections = viewRecordSections.filter((section) =>
+    section.id === "status-ownership" || section.id === "classification"
   )
-  const viewClassificationSection = getClassificationSectionConfig(savedRecord, "view")
-  const editClassificationSection = getClassificationSectionConfig(
-    draftRecord,
-    "edit",
-    handleChannelChange,
-    handleSeverityChange
-  )
-  const aiSourceSections = [
-    viewStatusOwnershipSection,
-    viewClassificationSection,
-  ]
   const aiCaseInput = buildAICaseInput(savedRecord, aiSourceSections)
   const aiRecordInsight = getFakeAIRecordInsight(aiCaseInput, aiVersion)
   const aiUpdatedLabel = formatAIUpdatedLabel(aiUpdatedAt)
@@ -1052,7 +785,15 @@ export default function App() {
     const matchesStatus =
       caseStatusFilter === "all" || record.status === caseStatusFilter
 
-    return matchesSearch && matchesStatus
+    const matchesKpiFilter =
+      caseKpiFilter === null ||
+      (caseKpiFilter === "open" && record.status !== "Resolved") ||
+      (caseKpiFilter === "waiting_on_customer" && record.status === "Waiting on customer") ||
+      (caseKpiFilter === "on_hold" && Boolean(record.onHoldUntil)) ||
+      (caseKpiFilter === "high_priority" &&
+        (record.priority === "High" || record.priority === "Critical"))
+
+    return matchesSearch && matchesStatus && matchesKpiFilter
   })
 
   function resetEditState(nextDraft: CaseRecord) {
@@ -1126,6 +867,10 @@ export default function App() {
     updateDraft("channel", nextChannel)
   }
 
+  function toggleCaseKpiFilter(nextFilter: CaseListKpiFilter) {
+    setCaseKpiFilter((current) => current === nextFilter ? null : nextFilter)
+  }
+
   function handleBackToCases() {
     if (mode === "edit" && hasUnsavedChanges) {
       const confirmed = window.confirm("Discard unsaved changes and return to the cases list?")
@@ -1176,126 +921,6 @@ export default function App() {
     refreshAIInsights()
   }
 
-  function renderSectionField(
-    field: FieldConfig,
-    record: CaseRecord,
-    renderMode: "view" | "edit"
-  ) {
-    const fieldValue = record[field.key]
-    const wrapperClassName = field.span === 2 ? "md:col-span-2" : undefined
-    const displayBehavior = field.displayBehavior ?? "compact"
-    const handleFieldChange = (nextValue: string) => {
-      if (field.onChange) {
-        field.onChange(nextValue)
-        return
-      }
-
-      updateDraft(field.key, nextValue as CaseRecord[typeof field.key])
-    }
-
-    const displayField = (
-      <DisplayField label={field.label} variant="tight">
-        <ReadOnlyValue
-          size="sm"
-          value={getDisplayValue(fieldValue)}
-          behavior={displayBehavior}
-          variant="compact"
-        />
-      </DisplayField>
-    )
-
-    if (renderMode === "view" || field.editable === false) {
-      return (
-        <div key={field.key} className={wrapperClassName}>
-          {displayField}
-        </div>
-      )
-    }
-
-    if (field.type === "select") {
-      return (
-        <div key={field.key} className={wrapperClassName}>
-          <Field label={field.label} required={field.required} error={field.error}>
-            <Select
-              size="sm"
-              name={field.key}
-              value={fieldValue}
-              onChange={(event) => handleFieldChange(event.target.value)}
-              onBlur={field.onBlur}
-            >
-              {field.options?.map((option) => (
-                <option key={option.value || option.label} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </Select>
-          </Field>
-        </div>
-      )
-    }
-
-    if (field.type === "textarea") {
-      return (
-        <div key={field.key} className={wrapperClassName}>
-          <Field label={field.label} required={field.required}>
-            <Textarea
-              size="sm"
-              name={field.key}
-              value={fieldValue}
-              onChange={(event) => handleFieldChange(event.target.value)}
-              onBlur={field.onBlur}
-            />
-          </Field>
-        </div>
-      )
-    }
-
-    return (
-      <div key={field.key} className={wrapperClassName}>
-        <Field label={field.label} required={field.required}>
-          <Input
-            size="sm"
-            name={field.key}
-            type={field.inputType ?? "text"}
-            value={fieldValue}
-            onChange={(event) => handleFieldChange(event.target.value)}
-            onBlur={field.onBlur}
-          />
-        </Field>
-      </div>
-    )
-  }
-
-  function renderSchemaSection(
-    section: SectionConfig,
-    record: CaseRecord,
-    renderMode: "view" | "edit"
-  ) {
-    const fields = section.fields.map((field) =>
-      renderSectionField(field, record, renderMode)
-    )
-
-    if (renderMode === "view") {
-      return (
-        <RecordSection
-          title={section.title}
-          description={section.description}
-          className="pt-[var(--space-4)]"
-        >
-          <RecordFieldGrid className="gap-y-[var(--space-3)] lg:grid-cols-2">
-            {fields}
-          </RecordFieldGrid>
-        </RecordSection>
-      )
-    }
-
-    return (
-      <FormSection title={section.title} description={section.description}>
-        <FormFieldGrid>{fields}</FormFieldGrid>
-      </FormSection>
-    )
-  }
-
   return (
     <main className="min-h-screen bg-page text-text-default [font-family:var(--font-sans)]">
       <PageContent width="xl">
@@ -1327,23 +952,36 @@ export default function App() {
             </section>
 
             <section className="grid gap-[var(--space-2)] px-[var(--space-section-sm)] md:grid-cols-2 xl:grid-cols-4 md:px-[var(--space-section-md)]">
-              {[
-                { label: "Open", value: openCaseCount },
-                { label: "Waiting on customer", value: waitingCaseCount },
-                { label: "On hold", value: onHoldCaseCount },
-                { label: "High priority", value: highPriorityCaseCount },
-              ].map((item) => (
-                <div
+              {(
+                [
+                { id: "open", label: "Open", value: openCaseCount },
+                { id: "waiting_on_customer", label: "Waiting on customer", value: waitingCaseCount },
+                { id: "on_hold", label: "On hold", value: onHoldCaseCount },
+                { id: "high_priority", label: "High priority", value: highPriorityCaseCount },
+                ] satisfies typeof caseListKpiItems
+              ).map((item) => (
+                <button
                   key={item.label}
-                  className="rounded-[var(--radius-md)] border border-[var(--color-border-divider)] bg-[var(--color-surface)] px-[var(--space-4)] py-[var(--space-3)]"
+                  type="button"
+                  onClick={() => toggleCaseKpiFilter(item.id)}
+                  aria-pressed={caseKpiFilter === item.id}
+                  className={`rounded-[var(--radius-md)] border px-[var(--space-4)] py-[var(--space-3)] text-left transition-colors focus-visible:outline-none ${
+                    caseKpiFilter === item.id
+                      ? "border-[var(--color-border-strong)] bg-[var(--color-surface-muted)]"
+                      : "border-[var(--color-border-divider)] bg-[var(--color-surface)] hover:bg-[var(--color-surface-muted)]"
+                  }`}
                 >
-                  <p className="text-[length:var(--text-meta)] leading-[var(--leading-normal)] text-[color:var(--color-text-secondary)]">
+                  <p className={`text-[length:var(--text-meta)] leading-[var(--leading-normal)] ${
+                    caseKpiFilter === item.id
+                      ? "text-[color:var(--color-text-primary)]"
+                      : "text-[color:var(--color-text-secondary)]"
+                  }`}>
                     {item.label}
                   </p>
                   <p className="pt-[var(--space-1)] text-xl leading-[var(--leading-snug)] text-[color:var(--color-text-primary)]">
                     {item.value}
                   </p>
-                </div>
+                </button>
               ))}
             </section>
 
@@ -1375,11 +1013,11 @@ export default function App() {
               </div>
 
               <div className="overflow-hidden">
-                <div className="hidden grid-cols-[minmax(0,2.4fr)_minmax(10rem,1.2fr)_minmax(10rem,1fr)_minmax(8rem,0.9fr)_minmax(10rem,1fr)_minmax(9rem,0.9fr)_1.5rem] gap-[var(--space-3)] bg-[var(--color-surface-muted)] px-[var(--space-4)] py-[var(--space-3)] md:grid">
+                <div className="hidden grid-cols-[minmax(0,2.4fr)_minmax(10rem,1.2fr)_minmax(10rem,1fr)_minmax(8rem,0.9fr)_minmax(10rem,1fr)_minmax(9rem,0.9fr)_1.5rem] gap-[var(--space-3)] border-y border-[var(--color-border-divider)] bg-[var(--color-surface-muted)] px-[var(--space-4)] py-[var(--space-3)] md:grid">
                   {["Case", "Customer", "Status", "Priority", "Assignee", "Updated", ""].map((label, index) => (
                     <div
                       key={`${label}-${index}`}
-                      className={`text-[length:var(--text-meta)] leading-[var(--leading-normal)] text-[color:var(--color-text-secondary)] ${index === 6 ? "text-right" : ""}`}
+                      className={`text-[length:var(--text-meta)] leading-[var(--leading-normal)] font-medium text-[color:var(--color-text-primary)] ${index === 6 ? "text-right" : ""}`}
                     >
                       {label}
                     </div>
@@ -1399,18 +1037,19 @@ export default function App() {
                           type="button"
                           onClick={() => openCase(record.id)}
                           className="group grid w-full cursor-pointer gap-[var(--space-2)] bg-[var(--color-surface)] px-[var(--space-4)] py-[var(--space-4)] text-left transition-colors hover:bg-[var(--color-surface-muted)] focus-visible:bg-[var(--color-surface-muted)] focus-visible:outline-none md:grid-cols-[minmax(0,2.4fr)_minmax(10rem,1.2fr)_minmax(10rem,1fr)_minmax(8rem,0.9fr)_minmax(10rem,1fr)_minmax(9rem,0.9fr)_1.5rem] md:items-center md:gap-[var(--space-3)]"
+                          aria-label={`Open case ${record.id}`}
                         >
                           <div className="min-w-0 space-y-[var(--space-half)]">
                             <p className="text-[length:var(--text-meta)] leading-[var(--leading-normal)] text-[color:var(--color-text-secondary)] transition-colors group-hover:text-[color:var(--color-text-primary)] group-focus-visible:text-[color:var(--color-text-primary)]">
                               {record.id}
                             </p>
                             <div className="flex min-w-0 items-start justify-between gap-[var(--space-2)]">
-                              <p className="min-w-0 text-sm leading-normal text-[color:var(--color-text-primary)] transition-colors group-hover:text-[color:var(--color-text-brand)] group-focus-visible:text-[color:var(--color-text-brand)]">
+                              <p className="min-w-0 text-sm leading-normal font-medium text-[color:var(--color-text-primary)] transition-colors group-hover:text-[color:var(--color-text-brand)] group-focus-visible:text-[color:var(--color-text-brand)]">
                                 {record.title}
                               </p>
                             </div>
                           </div>
-                          <div className="min-w-0 text-sm leading-normal text-[color:var(--color-text-primary)]">
+                          <div className="min-w-0 text-sm leading-normal text-[color:var(--color-text-primary)] transition-colors group-hover:text-[color:var(--color-text-brand)] group-focus-visible:text-[color:var(--color-text-brand)]">
                             {getDisplayValue(record.customer)}
                           </div>
                           <div className={`text-sm leading-normal ${statusDisplay.className}`}>
@@ -1419,11 +1058,11 @@ export default function App() {
                           <div className={`text-sm leading-normal ${priorityDisplay.className}`}>
                             {priorityDisplay.label}
                           </div>
-                          <div className="min-w-0 text-sm leading-normal text-[color:var(--color-text-primary)]">
+                          <div className="min-w-0 text-sm leading-normal text-[color:var(--color-text-primary)] transition-colors group-hover:text-[color:var(--color-text-brand)] group-focus-visible:text-[color:var(--color-text-brand)]">
                             {getDisplayValue(record.assignee)}
                           </div>
                           <div className="space-y-[var(--space-half)]">
-                            <p className="text-sm leading-[var(--leading-normal)] text-[color:var(--color-text-secondary)]">
+                            <p className="text-sm leading-[var(--leading-normal)] text-[color:var(--color-text-secondary)] transition-colors group-hover:text-[color:var(--color-text-primary)] group-focus-visible:text-[color:var(--color-text-primary)]">
                               {updatedDisplay.primary}
                             </p>
                             {updatedDisplay.secondary ? (
@@ -1488,175 +1127,15 @@ export default function App() {
 
             <div className="grid items-start gap-[var(--space-section-sm)] xl:grid-cols-[minmax(0,2fr)_minmax(18rem,1fr)]">
               <div className="min-w-0 space-y-[var(--space-4)]">
-                {renderSchemaSection(viewStatusOwnershipSection, savedRecord, "view")}
-                {renderSchemaSection(viewClassificationSection, savedRecord, "view")}
-
-                <RecordSection
-                  title="SLA & timing"
-                  description="Service-level settings, active targets, and timing signals for the current case."
-                  className="pt-[var(--space-4)]"
-                >
-                  <RecordFieldGrid className="gap-y-[var(--space-3)] lg:grid-cols-2">
-                    <Field label="Timeline policy" variant="tight">
-                      <ReadOnlyValue
-                        size="sm"
-                        value={getDisplayValue(savedRecord.timelinePolicy)}
-                        behavior="flexible"
-                        variant="compact"
-                      />
-                    </Field>
-                    <Field label="Response target" variant="tight">
-                      <ReadOnlyValue
-                        size="sm"
-                        value={getDisplayValue(savedRecord.responseTarget)}
-                        behavior="compact"
-                        variant="compact"
-                      />
-                    </Field>
-                    <Field label="Resolution target" variant="tight">
-                      <ReadOnlyValue
-                        size="sm"
-                        value={getDisplayValue(savedRecord.resolutionTarget)}
-                        behavior="compact"
-                        variant="compact"
-                      />
-                    </Field>
-                    <Field label="First response" variant="tight">
-                      <ReadOnlyValue
-                        size="sm"
-                        value={getDisplayValue(savedRecord.firstResponse)}
-                        behavior="compact"
-                        variant="compact"
-                      />
-                    </Field>
-                    <Field label="Last update" variant="tight">
-                      <ReadOnlyValue
-                        size="sm"
-                        value={getDisplayValue(savedRecord.lastUpdate)}
-                        behavior="compact"
-                        variant="compact"
-                      />
-                    </Field>
-                    <Field label="SLA status" variant="tight">
-                      <ReadOnlyValue
-                        size="sm"
-                        value={getDisplayValue(savedRecord.slaStatus)}
-                        behavior="compact"
-                        variant="compact"
-                      />
-                    </Field>
-                    <Field label="Breach risk" variant="tight">
-                      <ReadOnlyValue
-                        size="sm"
-                        value={getDisplayValue(savedRecord.breachRisk)}
-                        behavior="compact"
-                        variant="compact"
-                      />
-                    </Field>
-                  </RecordFieldGrid>
-                </RecordSection>
-
-                <RecordSection
-                  title="Customer & context"
-                  description="Customer identity, contact information, and commercial context for the case."
-                  className="pt-[var(--space-4)]"
-                >
-                  <RecordFieldGrid className="gap-y-[var(--space-3)] lg:grid-cols-2">
-                    <Field label="Customer" variant="tight">
-                      <ReadOnlyValue
-                        size="sm"
-                        value={getDisplayValue(savedRecord.customer)}
-                        behavior="flexible"
-                        variant="compact"
-                      />
-                    </Field>
-                    <Field label="Contact" variant="tight">
-                      <ReadOnlyValue
-                        size="sm"
-                        value={getDisplayValue(savedRecord.contact)}
-                        behavior="compact"
-                        variant="compact"
-                      />
-                    </Field>
-                    <Field label="Email" variant="tight">
-                      <ReadOnlyValue
-                        size="sm"
-                        value={getDisplayValue(savedRecord.email)}
-                        behavior="flexible"
-                        variant="compact"
-                      />
-                    </Field>
-                    <Field label="Account tier" variant="tight">
-                      <ReadOnlyValue
-                        size="sm"
-                        value={getDisplayValue(savedRecord.accountTier)}
-                        behavior="compact"
-                        variant="compact"
-                      />
-                    </Field>
-                    <Field label="Contract type" variant="tight">
-                      <ReadOnlyValue
-                        size="sm"
-                        value={getDisplayValue(savedRecord.contractType)}
-                        behavior="flexible"
-                        variant="compact"
-                      />
-                    </Field>
-                  </RecordFieldGrid>
-                </RecordSection>
-
-                <RecordSection
-                  title="Case handling"
-                  description="Escalation and approval settings that affect operational execution."
-                  className="pt-[var(--space-4)]"
-                >
-                  <RecordFieldGrid className="gap-y-[var(--space-3)] lg:grid-cols-2">
-                    <Field label="Routing group" variant="tight">
-                      <ReadOnlyValue
-                        size="sm"
-                        value={getDisplayValue(savedRecord.routingGroup)}
-                        behavior="flexible"
-                        variant="compact"
-                      />
-                    </Field>
-                    <Field label="Approval required" variant="tight">
-                      <ReadOnlyValue
-                        size="sm"
-                        value={getDisplayValue(savedRecord.approvalRequired)}
-                        behavior="compact"
-                        variant="compact"
-                      />
-                    </Field>
-                    {savedRecord.approvalRequired === "Yes" ? (
-                      <Field label="Approval reason" variant="tight">
-                        <ReadOnlyValue
-                          size="sm"
-                          value={getDisplayValue(savedRecord.approvalReason)}
-                          behavior="flexible"
-                          variant="compact"
-                        />
-                      </Field>
-                    ) : null}
-                  </RecordFieldGrid>
-                </RecordSection>
-
-                <RecordSection
-                  title="Description"
-                  description="Current customer-facing summary of the reported issue."
-                >
-                  <FieldGroupStack>
-                    <ReadOnlyValue size="sm" value={getDisplayValue(savedRecord.description)} multiline />
-                  </FieldGroupStack>
-                </RecordSection>
-
-                <RecordSection
-                  title="Internal notes"
-                  description="Internal notes captured during investigation and follow-up."
-                >
-                  <FieldGroupStack>
-                    <ReadOnlyValue size="sm" value={getDisplayValue(savedRecord.internalNotes)} multiline />
-                  </FieldGroupStack>
-                </RecordSection>
+                {viewRecordSections.map((section) =>
+                  renderCaseRecordSection({
+                    section,
+                    record: savedRecord,
+                    renderMode: "view",
+                    updateField: updateDraft,
+                    getDisplayValue,
+                  })
+                )}
               </div>
 
               <aside className="min-w-0 space-y-[var(--space-5)] border-t border-[var(--color-border-divider)] pt-[var(--space-6)] xl:border-t-0 xl:pt-0 xl:pl-[var(--space-section-sm)]">
@@ -1760,229 +1239,15 @@ export default function App() {
                 className="space-y-[var(--space-section-md)]"
                 onSubmit={handleSave}
               >
-                <FormSection
-                  title="Case identity"
-                  description="Primary editable identity for the current case."
-                >
-                  <FieldGroupStack>
-                    <Field label="Title" required error={visibleTitleError}>
-                      <Input
-                        size="sm"
-                        name="title"
-                        value={draftRecord.title}
-                        onChange={(event) => updateDraft("title", event.target.value)}
-                        onBlur={() => markTouched("title")}
-                      />
-                    </Field>
-                  </FieldGroupStack>
-                </FormSection>
-
-                {renderSchemaSection(editStatusOwnershipSection, draftRecord, "edit")}
-                {renderSchemaSection(editClassificationSection, draftRecord, "edit")}
-
-                <FormSection
-                  title="SLA & timing"
-                  description="Service levels, timestamps, and timing risk indicators."
-                >
-                  <FormFieldGrid>
-                    <div className="md:col-span-2">
-                      <Field label="Timeline policy">
-                        <Input
-                          size="sm"
-                          value={draftRecord.timelinePolicy}
-                          onChange={(event) => updateDraft("timelinePolicy", event.target.value)}
-                        />
-                      </Field>
-                    </div>
-
-                    <Field label="Response target">
-                      <Input
-                        size="sm"
-                        value={draftRecord.responseTarget}
-                        onChange={(event) => {
-                          setResponseTargetEdited(true)
-                          updateDraft("responseTarget", event.target.value)
-                        }}
-                      />
-                    </Field>
-
-                    <Field label="Resolution target">
-                      <Input
-                        size="sm"
-                        value={draftRecord.resolutionTarget}
-                        onChange={(event) => {
-                          setResolutionTargetEdited(true)
-                          updateDraft("resolutionTarget", event.target.value)
-                        }}
-                      />
-                    </Field>
-
-                    <Field label="First response">
-                      <Input
-                        size="sm"
-                        value={draftRecord.firstResponse}
-                        onChange={(event) => updateDraft("firstResponse", event.target.value)}
-                      />
-                    </Field>
-
-                    <Field label="Last update">
-                      <Input
-                        size="sm"
-                        value={draftRecord.lastUpdate}
-                        onChange={(event) => updateDraft("lastUpdate", event.target.value)}
-                      />
-                    </Field>
-
-                    <Field label="SLA status">
-                      <Select
-                        size="sm"
-                        value={draftRecord.slaStatus}
-                        onChange={(event) => updateDraft("slaStatus", event.target.value as CaseRecord["slaStatus"])}
-                      >
-                        <option>On track</option>
-                        <option>At risk</option>
-                        <option>Breached</option>
-                      </Select>
-                    </Field>
-
-                    <Field label="Breach risk">
-                      <Select
-                        size="sm"
-                        value={draftRecord.breachRisk}
-                        onChange={(event) => updateDraft("breachRisk", event.target.value as CaseRecord["breachRisk"])}
-                      >
-                        <option>Low</option>
-                        <option>Medium</option>
-                        <option>High</option>
-                      </Select>
-                    </Field>
-                  </FormFieldGrid>
-                </FormSection>
-
-                <FormSection
-                  title="Customer & context"
-                  description="Customer identity and commercial context connected to the case."
-                >
-                  <FormFieldGrid>
-                    <div className="md:col-span-2">
-                      <Field label="Customer">
-                        <Input
-                          size="sm"
-                          value={draftRecord.customer}
-                          onChange={(event) => updateDraft("customer", event.target.value)}
-                        />
-                      </Field>
-                    </div>
-
-                    <Field label="Contact">
-                      <Input
-                        size="sm"
-                        value={draftRecord.contact}
-                        onChange={(event) => updateDraft("contact", event.target.value)}
-                      />
-                    </Field>
-
-                    <Field label="Email">
-                      <Input
-                        size="sm"
-                        value={draftRecord.email}
-                        onChange={(event) => updateDraft("email", event.target.value)}
-                      />
-                    </Field>
-
-                    <Field label="Account tier">
-                      <Input
-                        size="sm"
-                        value={draftRecord.accountTier}
-                        onChange={(event) => updateDraft("accountTier", event.target.value)}
-                      />
-                    </Field>
-
-                    <Field label="Contract type">
-                      <Input
-                        size="sm"
-                        value={draftRecord.contractType}
-                        onChange={(event) => updateDraft("contractType", event.target.value)}
-                      />
-                    </Field>
-                  </FormFieldGrid>
-                </FormSection>
-
-                <FormSection
-                  title="Case handling"
-                  description="Operational settings that affect routing and approval handling."
-                >
-                  <FormFieldGrid>
-                    <div className="md:col-span-2">
-                      <Field label="Routing group">
-                        <Input
-                          size="sm"
-                          value={draftRecord.routingGroup}
-                          onChange={(event) => updateDraft("routingGroup", event.target.value)}
-                        />
-                      </Field>
-                    </div>
-
-                    <div className="md:col-span-2">
-                      <Field label="Approval required">
-                        <Select
-                          size="sm"
-                          value={draftRecord.approvalRequired}
-                          onChange={(event) =>
-                            updateDraft("approvalRequired", event.target.value as CaseRecord["approvalRequired"])
-                          }
-                        >
-                          <option>No</option>
-                          <option>Yes</option>
-                        </Select>
-                      </Field>
-                    </div>
-
-                    {draftRecord.approvalRequired === "Yes" ? (
-                      <div className="md:col-span-2">
-                        <Field label="Approval reason">
-                          <Input
-                            size="sm"
-                            value={draftRecord.approvalReason}
-                            onChange={(event) => updateDraft("approvalReason", event.target.value)}
-                          />
-                        </Field>
-                      </div>
-                    ) : null}
-                  </FormFieldGrid>
-                </FormSection>
-
-                <FormSection
-                  title="Description"
-                  description="Editable customer-facing problem summary for the case."
-                  className="pt-[var(--space-2)]"
-                >
-                  <FieldGroupStack>
-                    <Field>
-                      <Textarea
-                        size="sm"
-                        value={draftRecord.description}
-                        onChange={(event) => updateDraft("description", event.target.value)}
-                      />
-                    </Field>
-                  </FieldGroupStack>
-                </FormSection>
-
-                <FormSection
-                  title="Internal notes"
-                  description="Internal working notes for routing, remediation, and follow-up."
-                  className="pt-[var(--space-2)]"
-                >
-                  <FieldGroupStack>
-                    <Field hint="Internal only. This content is not shown to the customer.">
-                      <Textarea
-                        size="sm"
-                        value={draftRecord.internalNotes}
-                        onChange={(event) => updateDraft("internalNotes", event.target.value)}
-                      />
-                    </Field>
-                  </FieldGroupStack>
-                </FormSection>
+                {editRecordSections.map((section) =>
+                  renderCaseRecordSection({
+                    section,
+                    record: draftRecord,
+                    renderMode: "edit",
+                    updateField: updateDraft,
+                    getDisplayValue,
+                  })
+                )}
               </form>
             </FormPageLayout>
           </div>
@@ -2203,71 +1468,57 @@ export default function App() {
             </RecordSection>
 
             <RecordSection
-              title="Controls"
-              description="Interactive control primitives shown with shared field structure for alignment and validation testing."
+              title="Field system"
+              description="Field owns label, required state, supporting text, and spacing for both editable controls and read-only values."
               className="pt-[var(--space-4)]"
             >
               <FormFieldGrid>
-                <Field label="Title" required error={visibleTitleError}>
+                <Field
+                  label="Case title"
+                  required
+                  helper="Use the customer-facing summary so the case remains easy to scan in queues."
+                >
                   <Input
                     size="sm"
-                    name="title"
-                    value={draftRecord.title}
-                    onChange={(event) => updateDraft("title", event.target.value)}
-                    onBlur={() => markTouched("title")}
+                    name="field-system-title"
+                    defaultValue="Customer cannot access invoice portal"
                   />
                 </Field>
 
-                <Field label="Priority" required error={visiblePriorityError}>
-                  <Select
+                <Field
+                  label="Assignee"
+                  required
+                  helper="Helper text is intentionally hidden when an error is present."
+                  error="Select an owner before saving this case."
+                >
+                  <Input
                     size="sm"
-                    name="priority"
-                    value={draftRecord.priority}
-                    onChange={(event) => updateDraft("priority", event.target.value as CaseRecord["priority"])}
-                    onBlur={() => markTouched("priority")}
-                  >
-                    <option value="">Select priority</option>
-                    <option>Low</option>
-                    <option>Medium</option>
-                    <option>High</option>
-                    <option>Critical</option>
-                  </Select>
-                </Field>
-
-                <div className="md:col-span-2">
-                  <Field label="Internal notes" hint="Testing multiline rhythm and helper text alignment.">
-                    <Textarea
-                      size="sm"
-                      value={draftRecord.internalNotes}
-                      onChange={(event) => updateDraft("internalNotes", event.target.value)}
-                    />
-                  </Field>
-                </div>
-              </FormFieldGrid>
-            </RecordSection>
-
-            <RecordSection
-              title="Read-only values"
-              description="Read-only field states should remain structured, legible, and visually related to editable controls."
-              className="pt-[var(--space-4)]"
-            >
-              <RecordFieldGrid className="gap-y-[var(--space-3)] lg:grid-cols-2">
-                <Field label="Compact value" variant="tight">
-                  <ReadOnlyValue
-                    size="sm"
-                    value={getDisplayValue(savedRecord.customer)}
-                    behavior="compact"
-                    variant="compact"
+                    name="field-system-assignee"
+                    defaultValue=""
+                    placeholder="Select assignee"
                   />
                 </Field>
-                <Field label="Boxed value" variant="tight">
+
+                <Field
+                  label="Status reason"
+                  helper="Optional fields keep the same structure without the required marker."
+                >
+                  <Input
+                    size="sm"
+                    name="field-system-status-reason"
+                    defaultValue="Awaiting customer confirmation after account remediation."
+                  />
+                </Field>
+
+                <Field label="Assigned queue" variant="tight">
                   <ReadOnlyValue
                     size="sm"
-                    value={getDisplayValue(savedRecord.assignee)}
+                    value={getDisplayValue(savedRecord.queue)}
                     behavior="compact"
                   />
                 </Field>
-                <Field label="Flexible value" variant="tight">
+
+                <Field label="Contract type" variant="tight">
                   <ReadOnlyValue
                     size="sm"
                     value={getDisplayValue(savedRecord.contractType)}
@@ -2275,15 +1526,22 @@ export default function App() {
                     variant="compact"
                   />
                 </Field>
-                <Field label="Multiline" variant="tight">
-                  <ReadOnlyValue
-                    size="sm"
-                    value={getDisplayValue(savedRecord.description)}
-                    behavior="full-width"
-                    multiline
-                  />
-                </Field>
-              </RecordFieldGrid>
+
+                <div className="md:col-span-2">
+                  <Field
+                    label="Approval path and contracted exception coverage details"
+                    variant="tight"
+                    helper="Long labels and values keep the same wrapper rhythm in read-only presentation."
+                  >
+                    <ReadOnlyValue
+                      size="sm"
+                      value="Finance leadership approval is required before issuing accelerated customer credit for any merged-entity billing remediation that exceeds the contracted service exception threshold."
+                      behavior="full-width"
+                      multiline
+                    />
+                  </Field>
+                </div>
+              </FormFieldGrid>
             </RecordSection>
 
             <RecordSection
