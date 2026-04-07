@@ -5,9 +5,11 @@ import { getCaseRecordSections, STATUS_OPTIONS } from "./case-record/schema"
 import type { CaseRecord, SectionConfig } from "./case-record/types"
 import Button from "./components/Button"
 import CaseStatusBadge, { type CaseStatus } from "./components/CaseStatusBadge"
+import ActivityTimeline from "./components/ActivityTimeline"
 import Input from "./components/controls/Input"
 import ReadOnlyValue from "./components/controls/ReadOnlyValue"
 import Select from "./components/controls/Select"
+import Drawer from "./components/Drawer"
 import Field from "./components/fields/Field"
 import FieldGroupStack from "./components/field-groups/FieldGroupStack"
 import FormFieldGrid from "./components/field-groups/FormFieldGrid"
@@ -494,32 +496,88 @@ function getFakeAIRecordInsight(input: AICaseInput, aiVersion: number): AIRecord
   }
 }
 
-const recentActivity = [
+const activityTimelineItems = [
   {
+    id: "activity-0",
+    timestamp: "Apr 1, 2026, 08:54 CET",
+    timestampDateTime: "2026-04-01T08:54:00+02:00",
+    type: "incoming" as const,
     actor: "Marta Ruiz",
-    timestamp: "Today, 09:14",
-    detail: "Reported a third failed login after resetting the password.",
+    subtype: "Customer",
+    organization: "Green Valley Clinic",
+    content:
+      "Hi, we're still unable to access the invoice portal after resetting the password twice. This is blocking our finance team. Could you take a look?",
   },
   {
-    actor: "Support Ops",
-    timestamp: "Today, 09:26",
-    detail: "Confirmed the reset emails were delivered successfully.",
-  },
-  {
-    actor: "Routing engine",
-    timestamp: "Today, 09:41",
-    detail: "Moved the case to Billing Portal support for account-state review.",
-  },
-  {
+    id: "activity-1",
+    timestamp: "Apr 1, 2026, 09:07 CET",
+    timestampDateTime: "2026-04-01T09:07:00+02:00",
+    type: "comment" as const,
     actor: "Lucia Fernandez",
-    timestamp: "Today, 09:52",
-    detail: "Requested identity logs from the central authentication service team.",
+    subtype: "Support operations",
+    organization: "VivaLaVita",
+    content:
+      "Customer confirmed that invoice portal access still fails after two password resets and that the same issue affects the finance lead in the clinic group.",
+  },
+  {
+    id: "activity-1b",
+    timestamp: "Apr 1, 2026, 09:18 CET",
+    timestampDateTime: "2026-04-01T09:18:00+02:00",
+    type: "outgoing" as const,
+    actor: "Lucia Fernandez",
+    subtype: "Support agent",
+    organization: "VivaLaVita",
+    content:
+      "Hi Marta, thanks for reporting this. We’re currently investigating the issue with the invoice portal access. I’ll update you shortly once we confirm the root cause.",
+  },
+  {
+    id: "activity-2",
+    timestamp: "Apr 1, 2026, 09:26 CET",
+    timestampDateTime: "2026-04-01T09:26:00+02:00",
+    type: "status-change" as const,
+    actor: "Lucia Fernandez",
+    subtype: "Support operations",
+    organization: "VivaLaVita",
+    content:
+      "Case moved from New to In progress after support operations confirmed the incident is reproducible and requires account-state review.",
+  },
+  {
+    id: "activity-3",
+    timestamp: "Apr 1, 2026, 09:41 CET",
+    timestampDateTime: "2026-04-01T09:41:00+02:00",
+    type: "system" as const,
+    actor: "Auto-routing rule",
+    subtype: "System",
+    content:
+      "Routing engine reassigned the case to Billing Portal Support because recent tenant-state signals matched the portal access recovery workflow.",
+  },
+  {
+    id: "activity-4",
+    timestamp: "Apr 1, 2026, 10:12 CET",
+    timestampDateTime: "2026-04-01T10:12:00+02:00",
+    type: "comment" as const,
+    actor: "Lucia Fernandez",
+    subtype: "Internal note",
+    organization: "VivaLaVita",
+    content:
+      "Internal note added to preserve current session logs and wait for identity-service confirmation before asking the customer to attempt another login.",
   },
 ]
 
 const playgroundTabs = [
   { id: "screen", label: "Case screen" },
   { id: "components", label: "Components" },
+] as const
+
+const recordTabs = [
+  { id: "details", label: "Details" },
+  { id: "activity", label: "Activity" },
+] as const
+
+const componentTabs = [
+  { id: "details", label: "Details" },
+  { id: "activity", label: "Activity" },
+  { id: "insights", label: "AI" },
 ] as const
 
 const typeScaleSpecimens = [
@@ -717,8 +775,11 @@ function formatCaseListUpdated(value: string) {
 
 export default function App() {
   const [playgroundView, setPlaygroundView] = useState<"screen" | "components">("screen")
+  const [recordTab, setRecordTab] = useState<"details" | "activity">("details")
+  const [componentTab, setComponentTab] = useState<"details" | "activity" | "insights">("details")
   const [screenView, setScreenView] = useState<"list" | "record">("list")
   const [mode, setMode] = useState<"view" | "edit">("view")
+  const [isAIDrawerOpen, setIsAIDrawerOpen] = useState(false)
   const [cases, setCases] = useState(EXAMPLE_CASES)
   const [selectedCaseId, setSelectedCaseId] = useState(EXAMPLE_CASES[0]?.id ?? "")
   const [draftRecord, setDraftRecord] = useState(EXAMPLE_CASES[0] ?? INITIAL_CASE_RECORD)
@@ -861,6 +922,8 @@ export default function App() {
 
   function enterEditMode() {
     resetEditState(savedRecord)
+    setRecordTab("details")
+    setIsAIDrawerOpen(false)
     setMode("edit")
   }
 
@@ -873,6 +936,8 @@ export default function App() {
 
     setSelectedCaseId(caseId)
     resetEditState(nextCase)
+    setRecordTab("details")
+    setIsAIDrawerOpen(false)
     setMode("view")
     setScreenView("record")
     refreshAIInsights()
@@ -1202,8 +1267,8 @@ export default function App() {
             }
           />
           ) : mode === "view" ? (
-          <div className="space-y-[var(--space-4)]">
-            <div className="px-[var(--space-section-sm)] pt-[var(--space-4)] md:px-[var(--space-section-md)]">
+          <div>
+            <div className="px-[var(--space-section-sm)] pt-[var(--space-4)] pb-[var(--space-4)] md:px-[var(--space-section-md)]">
               <Button type="button" variant="ghost" onClick={handleBackToCases}>
                 Back to cases
               </Button>
@@ -1235,26 +1300,43 @@ export default function App() {
                 </Button>
               }
             />
+            <div className="px-[var(--space-section-sm)] md:px-[var(--space-section-md)] xl:pr-0">
+              <div className={`-mt-[var(--space-8)] grid items-stretch gap-y-[var(--space-section-sm)] xl:gap-x-[var(--space-8)] ${isAIDrawerOpen ? "xl:grid-cols-[minmax(0,1fr)_minmax(0,calc(var(--content-width-sm)_+_var(--control-height-sm)))]" : "xl:grid-cols-[minmax(0,1fr)_var(--control-height-sm)]"}`}>
+                <div className="min-w-0 space-y-[var(--space-4)] pt-[var(--space-8)]">
+                  <Tabs
+                    tabs={[...recordTabs]}
+                    activeTab={recordTab}
+                    onChange={(tabId) => setRecordTab(tabId as "details" | "activity")}
+                  />
 
-            <div className="grid items-start gap-[var(--space-section-sm)] xl:grid-cols-[minmax(0,2fr)_minmax(18rem,1fr)]">
-              <div className="min-w-0 space-y-[var(--space-4)]">
-                {viewRecordSections.map((section) =>
-                  renderCaseRecordSection({
-                    section,
-                    record: savedRecord,
-                    renderMode: "view",
-                    updateField: updateDraft,
-                    getDisplayValue,
-                  })
-                )}
-              </div>
+                  <div className="min-w-0 space-y-[var(--space-4)]">
+                    {recordTab === "details" ? (
+                      viewRecordSections.map((section) =>
+                        renderCaseRecordSection({
+                          section,
+                          record: savedRecord,
+                          renderMode: "view",
+                          updateField: updateDraft,
+                          getDisplayValue,
+                        })
+                      )
+                    ) : (
+                      <ActivityTimeline items={activityTimelineItems} />
+                    )}
+                  </div>
+                </div>
 
-              <aside className="min-w-0 space-y-[var(--space-5)] border-t border-[var(--color-border-divider)] pt-[var(--space-6)] xl:border-t-0 xl:pt-0 xl:pl-[var(--space-section-sm)]">
-                <section className="space-y-[var(--space-2)]">
-                  <div className="flex items-center justify-between gap-[var(--space-3)]">
-                    <p className="text-[length:var(--text-xs)] leading-[var(--leading-normal)] text-[color:var(--color-text-muted)]">
-                      {aiUpdatedLabel}
-                    </p>
+                <Drawer
+                  open={isAIDrawerOpen}
+                  title="AI assistance"
+                  metadata={aiUpdatedLabel}
+                  subtitle="Generated from visible case details and recent activity."
+                  onToggle={() => setIsAIDrawerOpen((current) => !current)}
+                  toggleLabel={isAIDrawerOpen ? "Collapse AI assistance" : "Open AI assistance"}
+                  railLabel="AI"
+                  onClose={() => setIsAIDrawerOpen(false)}
+                  closeLabel="Close AI assistance"
+                  actions={
                     <Link
                       href="#"
                       className="text-[length:var(--text-xs)] leading-[var(--leading-normal)] text-[color:var(--color-text-secondary)] hover:text-[color:var(--color-text-primary)]"
@@ -1265,57 +1347,38 @@ export default function App() {
                     >
                       Refresh summary
                     </Link>
-                  </div>
-                  <h3 className="m-0" style={asideTitleStyles}>
-                    Summary
-                  </h3>
-                  <p className="text-[length:var(--text-xs)] leading-[var(--leading-normal)] text-[color:var(--color-text-muted)]">
-                    Generated from visible case details and recent activity.
-                  </p>
-                  <ul className="list-outside list-disc space-y-[var(--space-1)] pt-[var(--space-1)] pl-[var(--space-4)] marker:text-[color:var(--color-text-secondary)]">
-                    {aiRecordInsight.summary.map((item) => (
-                      <li key={item} className="text-sm leading-normal text-[color:var(--color-text-primary)]">
-                        {item}
-                      </li>
-                    ))}
-                  </ul>
-                </section>
+                  }
+                >
+                  <section className="space-y-[var(--space-2)]">
+                    <h3 className="m-0" style={asideTitleStyles}>
+                      Summary
+                    </h3>
+                    <ul className="list-outside list-disc space-y-[var(--space-1)] pt-[var(--space-1)] pl-[var(--space-4)] marker:text-[color:var(--color-text-secondary)]">
+                      {aiRecordInsight.summary.map((item) => (
+                        <li key={item} className="text-sm leading-normal text-[color:var(--color-text-primary)]">
+                          {item}
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
 
-                <section className="space-y-[var(--space-2)]">
-                  <h3 className="m-0" style={asideTitleStyles}>
-                    Suggested actions
-                  </h3>
-                  <p className="text-[length:var(--text-xs)] leading-[var(--leading-normal)] text-[color:var(--color-text-muted)]">
-                    Suggested next steps. Review before action.
-                  </p>
-                  <ol className="list-outside list-decimal space-y-[var(--space-2)] pt-[var(--space-1)] pl-[var(--space-4)] marker:text-[color:var(--color-text-secondary)]">
-                    {aiRecordInsight.actions.map((action) => (
-                      <li key={action} className="text-sm leading-normal text-[color:var(--color-text-primary)]">
-                        {action}
-                      </li>
-                    ))}
-                  </ol>
-                </section>
-
-                <section className="space-y-[var(--space-2)]">
-                  <h3 className="m-0" style={asideTitleStyles}>
-                    Recent activity
-                  </h3>
-                  <ul className="list-outside list-disc space-y-[var(--space-1)] pl-[var(--space-4)] marker:text-[color:var(--color-text-secondary)]">
-                    {recentActivity.map((item) => (
-                      <li key={`${item.actor}-${item.timestamp}`} className="space-y-[var(--space-1)]">
-                        <p className="text-sm leading-normal text-[color:var(--color-text-primary)]">
-                          <span className="font-medium">{item.actor}</span>
-                          <span className="text-[color:var(--color-text-secondary)]">, {item.timestamp}</span>
-                        </p>
-                        <p className="text-sm leading-normal text-[color:var(--color-text-secondary)]">
-                          {item.detail}
-                        </p>
-                      </li>
-                    ))}
-                  </ul>
-                </section>
-              </aside>
+                  <section className="space-y-[var(--space-2)]">
+                    <h3 className="m-0" style={asideTitleStyles}>
+                      Suggested actions
+                    </h3>
+                    <p className="text-[length:var(--text-xs)] leading-[var(--leading-normal)] text-[color:var(--color-text-muted)]">
+                      Suggested next steps. Review before action.
+                    </p>
+                    <ol className="list-outside list-decimal space-y-[var(--space-2)] pt-[var(--space-1)] pl-[var(--space-4)] marker:text-[color:var(--color-text-secondary)]">
+                      {aiRecordInsight.actions.map((action) => (
+                        <li key={action} className="text-sm leading-normal text-[color:var(--color-text-primary)]">
+                          {action}
+                        </li>
+                      ))}
+                    </ol>
+                  </section>
+                </Drawer>
+              </div>
             </div>
           </div>
         ) : (
@@ -1365,6 +1428,53 @@ export default function App() {
           )
         ) : (
           <div className="space-y-[var(--space-4)]">
+            <RecordSection
+              title="Tabs"
+              description="Restrained section navigation for case record views and other enterprise page areas."
+              className="pt-[var(--space-4)]"
+            >
+              <div className="space-y-[var(--space-4)]">
+                <Tabs
+                  tabs={[...componentTabs]}
+                  activeTab={componentTab}
+                  onChange={(tabId) =>
+                    setComponentTab(tabId as "details" | "activity" | "insights")
+                  }
+                />
+
+                <div className="rounded-[var(--radius-sm)] border border-[var(--color-border-divider)] bg-[var(--color-surface-elevated)] px-[var(--space-4)] py-[var(--space-4)]">
+                  {componentTab === "details" ? (
+                    <div className="space-y-[var(--space-2)]">
+                      <h3 className="m-0" style={asideTitleStyles}>
+                        Details
+                      </h3>
+                      <p className="m-0 text-[length:var(--text-meta)] leading-[var(--leading-normal)] text-[color:var(--color-text-secondary)]">
+                        Structured record fields and sectioned case information.
+                      </p>
+                    </div>
+                  ) : componentTab === "activity" ? (
+                    <div className="space-y-[var(--space-2)]">
+                      <h3 className="m-0" style={asideTitleStyles}>
+                        Activity
+                      </h3>
+                      <p className="m-0 text-[length:var(--text-meta)] leading-[var(--leading-normal)] text-[color:var(--color-text-secondary)]">
+                        Chronological communication, workflow, and system updates.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-[var(--space-2)]">
+                      <h3 className="m-0" style={asideTitleStyles}>
+                        AI
+                      </h3>
+                      <p className="m-0 text-[length:var(--text-meta)] leading-[var(--leading-normal)] text-[color:var(--color-text-secondary)]">
+                        Generated summaries and suggested next steps for record review.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </RecordSection>
+
             <RecordSection
               title="Typography"
               description="Foundational size scale and semantic text roles used across the current design system."
@@ -1653,6 +1763,14 @@ export default function App() {
                   </Field>
                 </div>
               </FormFieldGrid>
+            </RecordSection>
+
+            <RecordSection
+              title="Activity timeline"
+              description="Structured vertical history for case activity, using time, type, and content hierarchy rather than decorative styling."
+              className="pt-[var(--space-4)]"
+            >
+              <ActivityTimeline items={activityTimelineItems} />
             </RecordSection>
 
             <RecordSection

@@ -189,6 +189,7 @@ export default function RecordShellBar({
   const actionsAreaClasses = [
     "flex",
     "shrink-0",
+    "ml-auto",
     showDirtyIndicator
       ? "self-stretch flex-col items-end justify-between gap-[var(--space-1)]"
       : "self-start items-center gap-[var(--space-3)]",

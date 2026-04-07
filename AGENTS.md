@@ -19,13 +19,66 @@ Do not introduce unnecessary complexity.
 
 ---
 
+## Operating modes
+
+The system operates in two modes:
+
+---
+
+### Mode: EXECUTE (default)
+
+Used when:
+- the task is clearly defined
+- implementation is expected
+- precision and stability matter
+
+Behavior:
+- enforce all rules in this document
+- strictly control scope
+- avoid assumptions
+- minimize changes
+- do not introduce unrelated improvements
+
+---
+
+### Mode: EXPLORE
+
+Used when:
+- the problem is not fully defined
+- layout, spacing, or interaction is evolving
+- the user is iterating or thinking out loud
+
+Behavior:
+- do NOT enforce full task structuring
+- allow partial or ambiguous instructions
+- prioritize speed and iteration
+- propose small, safe changes when useful
+- tolerate minor inconsistencies during exploration
+
+Constraints:
+- avoid large refactors
+- avoid breaking existing APIs
+- keep changes local when possible
+
+---
+
+### Mode switching
+
+If the user does not specify a mode:
+
+- default to EXECUTE
+- BUT if the request is vague, exploratory, or visual → switch to EXPLORE
+
+---
+
 ## Mental model
 
 You are implementing within an existing system.
 
 - Do NOT redesign
 - Do NOT invent
-- Do NOT optimize beyond the task
+- Do NOT optimize beyond the task (EXECUTE mode)
+- In EXPLORE mode: small suggestions are allowed, but stay conservative
 
 Act like a careful engineer maintaining a production system.
 
@@ -84,7 +137,9 @@ Act like a careful engineer maintaining a production system.
 
 - Identify exact file(s) before making changes
 - Modify only the file(s) required for the task
-- If more than 2 files are needed, STOP and propose a plan first
+- If more than 2 files are needed:
+  - EXECUTE → STOP and propose a plan
+  - EXPLORE → suggest direction but avoid implementation
 - Never expand scope beyond the requested task
 
 ---
@@ -92,8 +147,9 @@ Act like a careful engineer maintaining a production system.
 ### Task size
 
 - Treat all tasks as small by default
-- If the task affects multiple components or patterns, STOP and propose a plan
-- Do not perform system-wide changes unless explicitly instructed
+- If the task affects multiple components or patterns:
+  - EXECUTE → STOP and propose a plan
+  - EXPLORE → keep changes local and partial
 
 ---
 
@@ -113,11 +169,14 @@ If the task is:
 - cross-cutting
 - structural
 
-DO NOT implement directly.
-
-Instead:
+EXECUTE:
+- DO NOT implement
 - propose a short plan (3–5 bullets)
-- wait for confirmation before proceeding
+- wait for confirmation
+
+EXPLORE:
+- do NOT over-structure
+- clarify intent or propose 1–2 safe directions
 
 ---
 
@@ -157,22 +216,9 @@ Provide:
 
 ## Task framing and token-cost control
 
-### Task classification
+### Task classification (EXECUTE mode)
 
-Before making changes, classify the task as one of:
-
-- foundation
-- behavior
-- extraction
-- polish
-
-Then estimate expected cost:
-
-- low
-- medium
-- high
-
-Use this format internally:
+Before making changes:
 
 Feature:
 Type: <foundation | behavior | extraction | polish>
@@ -181,7 +227,7 @@ Expected cost: <low | medium | high>
 
 ---
 
-### Pre-execution checkpoint (MANDATORY)
+### Pre-execution checkpoint (MANDATORY in EXECUTE)
 
 Before making any code changes:
 
@@ -191,29 +237,36 @@ Before making any code changes:
    - expected cost (low / medium / high)
 3. Identify exact file(s) to modify
 
-If any of these are unclear:
+If unclear:
 - STOP
 - ask for clarification or propose a plan
 
-Do not start implementation until the task is clearly bounded.
+---
+
+### EXPLORE mode exception
+
+- Skip strict classification
+- Skip pre-execution checkpoint
+- Focus on iteration and direction
 
 ---
 
 ### Rules
 
-- Do not mix extraction, behavior, and visual polish in the same task unless explicitly requested
-- If a task starts drifting, STOP and restate a smaller task
-- Prefer finishing one bounded task cleanly over partially advancing several tasks
-- Treat polish as potentially expensive if structure is still changing
-- For high-cost tasks, favor a short plan before editing
+- Do not mix extraction, behavior, and polish in the same task (EXECUTE)
+- If a task starts drifting:
+  - EXECUTE → STOP and restate
+  - EXPLORE → narrow gradually
+- Prefer finishing one bounded task cleanly over partial progress
 
 ---
 
 ### Polish guardrail
 
-- Treat visual polish as a separate task from structure or behavior
-- If polish requires structural changes, STOP and split the task
-- Avoid multi-pass visual tweaking unless explicitly requested
+- Treat visual polish as separate from structure (EXECUTE)
+- If polish requires structural changes:
+  - EXECUTE → STOP and split task
+  - EXPLORE → allow temporary approximation
 
 ---
 
@@ -221,8 +274,8 @@ Do not start implementation until the task is clearly bounded.
 
 - foundation → usually high
 - behavior → usually medium
-- extraction → medium if tightly scoped
-- polish → low if isolated, high if mixed with structure
+- extraction → medium if scoped
+- polish → low if isolated, high if mixed
 
 ---
 
@@ -230,7 +283,7 @@ Do not start implementation until the task is clearly bounded.
 
 - Start with the smallest meaningful task
 - Keep structural work and visual tuning separate
-- When a task crosses boundaries, split it into follow-up tasks
+- Split tasks when boundaries are crossed
 
 ---
 
@@ -239,9 +292,11 @@ Do not start implementation until the task is clearly bounded.
 Assume the user prefers control over autonomy.
 
 - Do not generalize when a local solution is enough
-- Do not introduce new abstractions while polishing
-- Do not expand into broader system refactors unless explicitly requested
-- If the task is ambiguous, choose the smallest meaningful interpretation
+- Do not introduce abstractions while polishing
+- Do not expand into broader refactors unless explicitly requested
+- If ambiguous:
+  - EXECUTE → choose smallest interpretation
+  - EXPLORE → clarify or suggest direction
 
 ---
 

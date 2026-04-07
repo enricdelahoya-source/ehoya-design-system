@@ -17,9 +17,7 @@ export default function RecordSection({
   const titleId = useId()
 
   const sectionClasses = [
-    "px-[var(--space-section-sm)]",
     "pt-[var(--space-5)]",
-    "md:px-[var(--space-section-md)]",
     className,
   ]
     .filter(Boolean)

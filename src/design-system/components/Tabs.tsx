@@ -88,13 +88,14 @@ export default function Tabs({
    */
   const states = {
     active: [
-      "border-[var(--color-border-strong)]",
-      "text-[var(--color-text-default)]",
+      "-mb-[var(--border-width-navigation-active)]",
+      "border-b-[var(--color-accent)]",
+      "text-[var(--color-text-primary)]",
     ].join(" "),
     inactive: [
       "text-[var(--color-text-muted)]",
-      "hover:text-[var(--color-text-default)]",
-      "hover:border-[color-mix(in_srgb,var(--color-border-subtle)_65%,transparent)]",
+      "hover:text-[var(--color-text-primary)]",
+      "hover:border-b-[color-mix(in_srgb,var(--color-border-subtle)_65%,transparent)]",
     ].join(" "),
   }
 
