@@ -3,6 +3,7 @@
   --color-surface: var(--color-warm-100);
   --color-surface-hover: var(--color-warm-225);
   --color-surface-muted: var(--color-warm-300);
+  --color-surface-structural-muted: var(--color-warm-175);
   --color-surface-elevated: var(--color-warm-50);
   --color-surface-shell: var(--color-warm-25);
   --color-surface-shell-editing: color-mix(in srgb, var(--color-accent) 4%, var(--color-surface-shell));
