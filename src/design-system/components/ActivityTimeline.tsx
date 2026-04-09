@@ -36,6 +36,8 @@ type ActivityTimelineProps = {
   ariaLabel?: string
   emptyMessage?: ReactNode
   className?: string
+  scrollListOnly?: boolean
+  highlightedItemId?: string | null
 }
 
 const DEFAULT_TYPE_LABELS: Record<ActivityTimelineEventType, string> = {
@@ -268,6 +270,8 @@ export default function ActivityTimeline({
   ariaLabel = "Activity timeline",
   emptyMessage = "No activity yet.",
   className = "",
+  scrollListOnly = false,
+  highlightedItemId = null,
 }: ActivityTimelineProps) {
   const [isComposerOpen, setIsComposerOpen] = useState(false)
   const [composerActivityType, setComposerActivityType] =
@@ -285,7 +289,11 @@ export default function ActivityTimeline({
       ? "Add an email update"
       : "Add an internal note"
 
-  const rootClasses = ["w-full", className].filter(Boolean).join(" ")
+  const rootClasses = [
+    "w-full",
+    scrollListOnly ? "flex h-full min-h-0 flex-col" : "",
+    className,
+  ].filter(Boolean).join(" ")
   const composerClasses = [
     "space-y-[var(--space-3)]",
     "border-y",
@@ -304,6 +312,12 @@ export default function ActivityTimeline({
   ].join(" ")
 
   const groupsClasses = ["space-y-[var(--space-stack-md)]"].join(" ")
+  const scrollRegionClasses = [
+    "min-h-0",
+    "flex-1",
+    "overflow-y-auto",
+    "pt-[var(--space-stack-md)]",
+  ].join(" ")
 
   const groupClasses = [
     "space-y-[var(--space-stack-sm)]",
@@ -334,6 +348,8 @@ export default function ActivityTimeline({
     "pt-[var(--space-3)]",
     "first:border-t-0",
     "first:pt-0",
+    "transition-[background-color,border-color,box-shadow]",
+    "duration-700",
   ].join(" ")
 
   const identityRowClasses = [
@@ -526,225 +542,238 @@ export default function ActivityTimeline({
 
   return (
     <div className={rootClasses}>
-      <div className={groupsClasses}>
-        <section className={composerClasses} aria-label={`${ariaLabel}: add action`}>
-          {isComposerOpen ? (
-            <div className="space-y-[var(--space-3)]">
-              <div className="space-y-[var(--space-1)]">
-                <label htmlFor="activity-timeline-composer-type" className={composerFieldLabelClasses}>
-                  Activity type
-                </label>
-                <Select
-                  id="activity-timeline-composer-type"
-                  size="sm"
-                  value={composerActivityType}
-                  onChange={(event) =>
-                    setComposerActivityType(event.target.value as ComposerActivityType)
-                  }
-                  aria-label="Activity type"
-                >
-                  {COMPOSER_ACTIVITY_TYPE_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-
-              <Textarea
+      <section className={composerClasses} aria-label={`${ariaLabel}: add action`}>
+        {isComposerOpen ? (
+          <div className="space-y-[var(--space-3)]">
+            <div className="space-y-[var(--space-1)]">
+              <label htmlFor="activity-timeline-composer-type" className={composerFieldLabelClasses}>
+                Activity type
+              </label>
+              <Select
+                id="activity-timeline-composer-type"
                 size="sm"
-                value={draftNote}
-                onChange={(event) => setDraftNote(event.target.value)}
-                placeholder={composerPlaceholder}
-                aria-label="New timeline entry"
-              />
-
-              <div className="flex flex-wrap items-center gap-[var(--space-2)]">
-                <Button
-                  type="button"
-                  variant="primary"
-                  size="sm"
-                  disabled={!trimmedDraftNote}
-                  onClick={handleSaveNote}
-                >
-                  Save
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleCancelComposer}
-                >
-                  Cancel
-                </Button>
-              </div>
+                value={composerActivityType}
+                onChange={(event) =>
+                  setComposerActivityType(event.target.value as ComposerActivityType)
+                }
+                aria-label="Activity type"
+              >
+                {COMPOSER_ACTIVITY_TYPE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </Select>
             </div>
-          ) : (
-            <div className="flex flex-wrap items-center justify-between gap-[var(--space-3)]">
-              <p className={composerMetaClasses}>Add a new entry to the timeline.</p>
-              <Button type="button" variant="secondary" size="sm" onClick={handleOpenComposer}>
-                Add action
+
+            <Textarea
+              size="sm"
+              value={draftNote}
+              onChange={(event) => setDraftNote(event.target.value)}
+              placeholder={composerPlaceholder}
+              aria-label="New timeline entry"
+            />
+
+            <div className="flex flex-wrap items-center gap-[var(--space-2)]">
+              <Button
+                type="button"
+                variant="primary"
+                size="sm"
+                disabled={!trimmedDraftNote}
+                onClick={handleSaveNote}
+              >
+                Save
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={handleCancelComposer}
+              >
+                Cancel
               </Button>
             </div>
-          )}
-        </section>
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-center justify-between gap-[var(--space-3)]">
+            <p className={composerMetaClasses}>Add a new entry to the timeline.</p>
+            <Button type="button" variant="secondary" size="sm" onClick={handleOpenComposer}>
+              Add action
+            </Button>
+          </div>
+        )}
+      </section>
 
+      <div className={scrollListOnly ? scrollRegionClasses : groupsClasses}>
         {timelineItems.length === 0 ? (
           <p className={emptyStateClasses}>{emptyMessage}</p>
         ) : (
-          orderedGroups.map((group, groupIndex) => (
-            <section
-              key={`${group.key}-${groupIndex}`}
-              aria-label={`${ariaLabel}: ${group.label}`}
-              className={groupClasses}
-            >
-              <div className={groupHeaderWrapClasses}>
-                <h3 className={groupHeaderClasses}>{group.label}</h3>
-              </div>
+          <div className={groupsClasses}>
+            {orderedGroups.map((group, groupIndex) => (
+              <section
+                key={`${group.key}-${groupIndex}`}
+                aria-label={`${ariaLabel}: ${group.label}`}
+                className={groupClasses}
+              >
+                <div className={groupHeaderWrapClasses}>
+                  <h3 className={groupHeaderClasses}>{group.label}</h3>
+                </div>
 
-              <ol className={listClasses}>
-                {[...group.items].reverse().map((item) => {
-                  const typeLabel = item.typeLabel ?? DEFAULT_TYPE_LABELS[item.type]
-                  const rowDate = formatActivityRowDate(item.timestampDateTime)
-                  const rowTime = formatActivityRowTime(item.timestampDateTime)
-                  const sourceIdentity =
-                    item.actor ?? item.source ?? item.secondaryMeta
-                  const roleLabel = item.subtype ?? DEFAULT_ROLE_LABELS[item.type]
-                  const organizationLabel = item.organization
-                  const origin = getActivityOrigin(item, roleLabel)
-                  const badgeTone = BADGE_TONE_BY_ORIGIN[origin]
-                  const badgeEmphasis = BADGE_EMPHASIS_BY_ORIGIN[origin]
-                  const textContent =
-                    typeof item.content === "string" ? item.content : null
-                  const isTextContent = textContent !== null
-                  const isLongContent =
-                    isTextContent && textContent.length > COLLAPSED_CONTENT_LENGTH
-                  const isExpanded = expandedItemIds[item.id] ?? false
-                  const isDeletableInternalNote =
-                    item.actor === "You" &&
-                    item.type === "comment" &&
-                    item.subtype === "Internal note"
-                  const hasAISummary = visibleAISummaryItemIds.has(item.id)
+                <ol className={listClasses}>
+                  {[...group.items].reverse().map((item) => {
+                    const typeLabel = item.typeLabel ?? DEFAULT_TYPE_LABELS[item.type]
+                    const rowDate = formatActivityRowDate(item.timestampDateTime)
+                    const rowTime = formatActivityRowTime(item.timestampDateTime)
+                    const sourceIdentity =
+                      item.actor ?? item.source ?? item.secondaryMeta
+                    const roleLabel = item.subtype ?? DEFAULT_ROLE_LABELS[item.type]
+                    const organizationLabel = item.organization
+                    const origin = getActivityOrigin(item, roleLabel)
+                    const badgeTone = BADGE_TONE_BY_ORIGIN[origin]
+                    const badgeEmphasis = BADGE_EMPHASIS_BY_ORIGIN[origin]
+                    const textContent =
+                      typeof item.content === "string" ? item.content : null
+                    const isTextContent = textContent !== null
+                    const isLongContent =
+                      isTextContent && textContent.length > COLLAPSED_CONTENT_LENGTH
+                    const isExpanded = expandedItemIds[item.id] ?? false
+                    const isDeletableInternalNote =
+                      item.actor === "You" &&
+                      item.type === "comment" &&
+                      item.subtype === "Internal note"
+                    const hasAISummary = visibleAISummaryItemIds.has(item.id)
 
-                  return (
-                    <li key={item.id} className={itemClasses}>
-                      <div className={identityRowClasses}>
-                        <span
-                          className="inline-flex shrink-0 align-middle"
-                          style={{
-                            transform:
-                              "translateY(var(--offset-status-badge-inline))",
-                          }}
-                        >
-                          <StatusBadge
-                            tone={badgeTone}
-                            emphasis={badgeEmphasis}
-                            size="sm"
+                    return (
+                      <li
+                        key={item.id}
+                        id={item.id}
+                        className={[
+                          itemClasses,
+                          highlightedItemId === item.id
+                            ? "rounded-[var(--radius-sm)] bg-[var(--color-surface-muted)] outline outline-1 -outline-offset-1 outline-[var(--color-border-strong)]"
+                            : "",
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
+                      >
+                        <div className={identityRowClasses}>
+                          <span
+                            className="inline-flex shrink-0 align-middle"
+                            style={{
+                              transform:
+                                "translateY(var(--offset-status-badge-inline))",
+                            }}
                           >
-                            {typeLabel}
-                          </StatusBadge>
-                        </span>
-
-                        {rowDate ? (
-                          <span className={rowDateClasses}>{rowDate}</span>
-                        ) : null}
-
-                        {item.timestampDateTime ? (
-                          <time
-                            className={rowTimeClasses}
-                            dateTime={item.timestampDateTime}
-                          >
-                            {rowTime ?? item.timestamp}
-                          </time>
-                        ) : (
-                          <span className={rowTimeClasses}>{item.timestamp}</span>
-                        )}
-                      </div>
-
-                      {sourceIdentity || roleLabel || organizationLabel ? (
-                        <div className={sourceRowClasses}>
-                          {sourceIdentity ? (
-                            <span className={sourceClasses}>{sourceIdentity}</span>
-                          ) : null}
-
-                          {sourceIdentity && roleLabel ? (
-                            <span aria-hidden="true" className={roleClasses}>
-                              ·
-                            </span>
-                          ) : null}
-
-                          {roleLabel ? (
-                            <span className={roleClasses}>{roleLabel}</span>
-                          ) : null}
-
-                          {(sourceIdentity || roleLabel) && organizationLabel ? (
-                            <span aria-hidden="true" className={organizationClasses}>
-                              ·
-                            </span>
-                          ) : null}
-
-                          {organizationLabel ? (
-                            <span className={organizationClasses}>{organizationLabel}</span>
-                          ) : null}
-                        </div>
-                      ) : null}
-
-                      <div className={contentRowClasses}>
-                        <div
-                          className={[
-                            contentClasses,
-                            isLongContent && !isExpanded ? collapsedContentClasses : "",
-                          ]
-                            .filter(Boolean)
-                            .join(" ")}
-                        >
-                          {item.content}
-                        </div>
-                        {hasAISummary ? (
-                          <div className={summaryWrapClasses}>
-                            <div className={summaryLabelClasses}>AI summary</div>
-                            <p
-                              className={[
-                                summaryClasses,
-                                !isExpanded ? collapsedSummaryClasses : "",
-                              ]
-                                .filter(Boolean)
-                                .join(" ")}
+                            <StatusBadge
+                              tone={badgeTone}
+                              emphasis={badgeEmphasis}
+                              size="sm"
                             >
-                              {item.aiSummary}
-                            </p>
-                          </div>
-                        ) : null}
-                        {isLongContent || isDeletableInternalNote ? (
-                          <div className={actionAreaClasses}>
-                            {isLongContent ? (
-                              <button
-                                type="button"
-                                className={actionButtonClasses}
-                                onClick={() => toggleExpandedItem(item.id)}
-                              >
-                                {isExpanded ? "Show less" : "Show more"}
-                              </button>
+                              {typeLabel}
+                            </StatusBadge>
+                          </span>
+
+                          {rowDate ? (
+                            <span className={rowDateClasses}>{rowDate}</span>
+                          ) : null}
+
+                          {item.timestampDateTime ? (
+                            <time
+                              className={rowTimeClasses}
+                              dateTime={item.timestampDateTime}
+                            >
+                              {rowTime ?? item.timestamp}
+                            </time>
+                          ) : (
+                            <span className={rowTimeClasses}>{item.timestamp}</span>
+                          )}
+                        </div>
+
+                        {sourceIdentity || roleLabel || organizationLabel ? (
+                          <div className={sourceRowClasses}>
+                            {sourceIdentity ? (
+                              <span className={sourceClasses}>{sourceIdentity}</span>
                             ) : null}
 
-                            {isDeletableInternalNote ? (
-                              <button
-                                type="button"
-                                className={`${actionButtonClasses} ${itemDeleteClasses}`}
-                                onClick={() => handleDeleteItem(item.id)}
-                              >
-                                Delete
-                              </button>
+                            {sourceIdentity && roleLabel ? (
+                              <span aria-hidden="true" className={roleClasses}>
+                                ·
+                              </span>
+                            ) : null}
+
+                            {roleLabel ? (
+                              <span className={roleClasses}>{roleLabel}</span>
+                            ) : null}
+
+                            {(sourceIdentity || roleLabel) && organizationLabel ? (
+                              <span aria-hidden="true" className={organizationClasses}>
+                                ·
+                              </span>
+                            ) : null}
+
+                            {organizationLabel ? (
+                              <span className={organizationClasses}>{organizationLabel}</span>
                             ) : null}
                           </div>
                         ) : null}
-                      </div>
-                    </li>
-                  )
-                })}
-              </ol>
-            </section>
-          ))
+
+                        <div className={contentRowClasses}>
+                          <div
+                            className={[
+                              contentClasses,
+                              isLongContent && !isExpanded ? collapsedContentClasses : "",
+                            ]
+                              .filter(Boolean)
+                              .join(" ")}
+                          >
+                            {item.content}
+                          </div>
+                          {hasAISummary ? (
+                            <div className={summaryWrapClasses}>
+                              <div className={summaryLabelClasses}>AI summary</div>
+                              <p
+                                className={[
+                                  summaryClasses,
+                                  !isExpanded ? collapsedSummaryClasses : "",
+                                ]
+                                  .filter(Boolean)
+                                  .join(" ")}
+                              >
+                                {item.aiSummary}
+                              </p>
+                            </div>
+                          ) : null}
+                          {isLongContent || isDeletableInternalNote ? (
+                            <div className={actionAreaClasses}>
+                              {isLongContent ? (
+                                <button
+                                  type="button"
+                                  className={actionButtonClasses}
+                                  onClick={() => toggleExpandedItem(item.id)}
+                                >
+                                  {isExpanded ? "Show less" : "Show more"}
+                                </button>
+                              ) : null}
+
+                              {isDeletableInternalNote ? (
+                                <button
+                                  type="button"
+                                  className={`${actionButtonClasses} ${itemDeleteClasses}`}
+                                  onClick={() => handleDeleteItem(item.id)}
+                                >
+                                  Delete
+                                </button>
+                              ) : null}
+                            </div>
+                          ) : null}
+                        </div>
+                      </li>
+                    )
+                  })}
+                </ol>
+              </section>
+            ))}
+          </div>
         )}
       </div>
     </div>

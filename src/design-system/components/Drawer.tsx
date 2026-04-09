@@ -41,8 +41,11 @@ export default function Drawer({
 
   const panelClasses = [
     "min-w-0",
+    "flex",
+    "h-full",
     "flex-1",
-    "min-h-full",
+    "min-h-0",
+    "flex-col",
     "border",
     "border-[var(--color-border-divider)]",
     "border-r-0",
@@ -162,6 +165,9 @@ export default function Drawer({
   ].join(" ")
 
   const bodyClasses = [
+    "min-h-0",
+    "flex-1",
+    "overflow-y-auto",
     "space-y-[var(--space-5)]",
     "px-[var(--space-4)]",
     "py-[var(--space-4)]",

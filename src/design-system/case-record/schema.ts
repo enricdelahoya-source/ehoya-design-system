@@ -10,6 +10,10 @@ function shouldShowStatusReason(status: CaseRecord["status"]) {
   return status === "Waiting on customer" || status === "Escalated" || status === "Resolved"
 }
 
+function shouldShowBlockingReason(status: CaseRecord["status"]) {
+  return status === "Waiting on customer"
+}
+
 function shouldShowOnHoldUntil(status: CaseRecord["status"]) {
   return status === "Waiting on customer"
 }
@@ -42,6 +46,15 @@ const PRIORITY_OPTIONS: FieldOption[] = [
   { value: "Medium", label: "Medium" },
   { value: "High", label: "High" },
   { value: "Critical", label: "Critical" },
+]
+
+const BLOCKING_REASON_OPTIONS: FieldOption[] = [
+  { value: "", label: "Select blocking reason" },
+  { value: "none", label: "No blocking reason" },
+  { value: "awaiting_customer_reply", label: "Awaiting customer reply" },
+  { value: "awaiting_customer_validation", label: "Awaiting customer validation" },
+  { value: "awaiting_approval", label: "Awaiting approval" },
+  { value: "awaiting_engineering_fix", label: "Awaiting engineering fix" },
 ]
 
 const CHANNEL_OPTIONS: FieldOption[] = [
@@ -107,6 +120,14 @@ function getStatusOwnershipSectionConfig(
         type: "text",
         span: 2,
         displayBehavior: "flexible",
+      },
+      {
+        key: "blockingReason",
+        label: "Blocking reason",
+        type: "select",
+        options: BLOCKING_REASON_OPTIONS,
+        when: (currentRecord) => shouldShowBlockingReason(currentRecord.status),
+        span: 2,
       },
       {
         key: "statusReason",

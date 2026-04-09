@@ -64,10 +64,12 @@ export default function RecordShellBar({
     mode === "edit"
       ? "bg-[var(--color-surface-shell-editing)]"
       : "bg-[var(--color-surface-shell)]",
-    "mb-[var(--space-8)]",
   ].join(" ")
 
   const inner = [
+    "mx-auto",
+    "w-full",
+    "max-w-[var(--content-width-xl)]",
     "flex",
     "flex-col",
     "gap-[var(--space-2)]",

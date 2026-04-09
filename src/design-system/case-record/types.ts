@@ -4,6 +4,13 @@ export type CaseRecord = {
   title: string
   id: string
   status: "New" | "In progress" | "Waiting on customer" | "Escalated" | "Resolved"
+  blockingReason:
+    | ""
+    | "none"
+    | "awaiting_customer_reply"
+    | "awaiting_customer_validation"
+    | "awaiting_approval"
+    | "awaiting_engineering_fix"
   priority: "" | "Low" | "Medium" | "High" | "Critical"
   assignee: string
   queue: string
