@@ -1,11 +1,11 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import CasesListTemplate from "./case-list/CasesListTemplate"
 import { renderCaseRecordSection } from "./case-record/renderers"
 import { getCaseRecordSections, STATUS_OPTIONS } from "./case-record/schema"
 import type { CaseRecord, SectionConfig } from "./case-record/types"
 import Button from "./components/Button"
 import CaseStatusBadge, { type CaseStatus } from "./components/CaseStatusBadge"
-import ActivityTimeline from "./components/ActivityTimeline"
+import ActivityTimeline, { type ActivityTimelineItem } from "./components/ActivityTimeline"
 import Input from "./components/controls/Input"
 import ReadOnlyValue from "./components/controls/ReadOnlyValue"
 import Select from "./components/controls/Select"
@@ -23,6 +23,7 @@ import StatusBadge from "./components/StatusBadge"
 import Tabs from "./components/Tabs"
 import {
   activityTimelineItems,
+  activityTimelineItemsByCaseId,
   EXAMPLE_CASES,
   INITIAL_CASE_RECORD,
 } from "../prototype/mockData"
@@ -32,6 +33,7 @@ type AICaseInput = {
   title: string
   status: string
   priority?: string
+  blockingReason?: CaseRecord["blockingReason"]
   sections: {
     title: string
     fields: {
@@ -42,11 +44,22 @@ type AICaseInput = {
 }
 
 type AIRecordInsight = {
+  signals: string[]
   summary: string[]
-  actions: string[]
+  actions: {
+    label: string
+    referenceId?: string
+  }[]
+  references: {
+    id: string
+    label: string
+  }[]
 }
 
 type AICaseSignals = {
+  status: AICaseInput["status"]
+  priority?: AICaseInput["priority"]
+  blockingReason: CaseRecord["blockingReason"]
   isEscalated: boolean
   isWaitingOnCustomer: boolean
   isHighPriority: boolean
@@ -54,6 +67,12 @@ type AICaseSignals = {
   isMigrationRelated: boolean
   isVisibilityIssue: boolean
   isAuthRelated: boolean
+}
+
+type AIEvidenceSignal = {
+  intent: "blocked" | "progress" | "resolved"
+  blockingReason: CaseRecord["blockingReason"]
+  selectedEvent?: ActivityTimelineItem
 }
 
 type CaseListKpiFilter =
@@ -111,9 +130,11 @@ function buildAICaseInput(record: CaseRecord, sections: SectionConfig[]): AICase
     title: record.title,
     status: record.status,
     priority: record.priority || undefined,
+    blockingReason: record.blockingReason || undefined,
     sections: sections.map((section) => ({
       title: section.title,
       fields: section.fields
+        .filter((field) => !field.when || field.when(record))
         .filter((field) => !excludedTopLevelFieldLabels.has(field.label))
         .map((field) => {
           const rawValue = record[field.key]
@@ -125,6 +146,36 @@ function buildAICaseInput(record: CaseRecord, sections: SectionConfig[]): AICase
           }
         }),
     })),
+  }
+}
+
+function getBlockingReasonSummary(reason: CaseRecord["blockingReason"]) {
+  switch (reason) {
+    case "awaiting_customer_reply":
+      return "The case is currently blocked on a customer reply."
+    case "awaiting_customer_validation":
+      return "The case is waiting for the customer to validate the current remediation."
+    case "awaiting_approval":
+      return "The case is paused pending approval before the next operational step."
+    case "awaiting_engineering_fix":
+      return "The case is blocked on an engineering-side fix before progress can resume."
+    default:
+      return null
+  }
+}
+
+function getBlockingReasonAction(reason: CaseRecord["blockingReason"]) {
+  switch (reason) {
+    case "awaiting_customer_reply":
+      return "Request customer reply"
+    case "awaiting_customer_validation":
+      return "Ask for customer validation"
+    case "awaiting_approval":
+      return "Confirm approval path"
+    case "awaiting_engineering_fix":
+      return "Track engineering handoff"
+    default:
+      return null
   }
 }
 
@@ -147,6 +198,9 @@ function detectAICaseSignals(input: AICaseInput): AICaseSignals {
     keywords.some((keyword) => combinedCaseText.includes(keyword))
 
   return {
+    status: input.status,
+    priority: input.priority,
+    blockingReason: input.blockingReason ?? "",
     isEscalated: input.status === "Escalated",
     isWaitingOnCustomer: input.status === "Waiting on customer",
     isHighPriority:
@@ -158,85 +212,347 @@ function detectAICaseSignals(input: AICaseInput): AICaseSignals {
   }
 }
 
-function buildFakeSummary(signals: AICaseSignals): string[] {
-  const summary: string[] = []
+function buildFakeSignalItems(signals: AICaseSignals): string[] {
+  const items = [`Status: ${signals.status}`]
 
-  if (signals.isEscalated) {
-    summary.push("The case shows escalation signals.")
-  } else if (signals.isWaitingOnCustomer) {
-    summary.push("The case is currently blocked on customer input.")
-  } else if (signals.isHighPriority) {
-    summary.push("The case carries elevated operational priority.")
-  } else {
-    summary.push("The case is active and still needs operational review.")
+  if (signals.priority) {
+    items.push(`Priority: ${signals.priority}`)
   }
 
-  if (signals.isMigrationRelated && signals.isVisibilityIssue) {
-    summary.push("Likely cause: migration or permissions drift is affecting visibility.")
-  } else if (signals.isAuthRelated) {
-    summary.push("Likely cause: identity or access state is out of sync.")
-  } else if (signals.isMigrationRelated) {
-    summary.push("Likely cause: migration or tenant-state mismatch.")
-  } else if (signals.isVisibilityIssue) {
-    summary.push("Likely cause: visibility scope or permissions are misaligned.")
-  } else {
-    summary.push("Likely cause: the current case record still points to an unresolved workflow issue.")
+  if (signals.blockingReason === "awaiting_customer_reply") {
+    items.push("Blocker: awaiting customer reply")
+  } else if (signals.blockingReason === "awaiting_customer_validation") {
+    items.push("Blocker: awaiting customer validation")
+  } else if (signals.blockingReason === "awaiting_approval") {
+    items.push("Blocker: awaiting approval")
+  } else if (signals.blockingReason === "awaiting_engineering_fix") {
+    items.push("Blocker: awaiting engineering fix")
+  }
+
+  if (signals.isEscalated) {
+    items.push("Escalation: active")
   }
 
   if (signals.needsApproval) {
-    summary.push("Approval may be required before repair or customer-impacting action.")
+    items.push("Approval: required")
   }
-
-  if (signals.isWaitingOnCustomer) {
-    summary.push("Progress is likely to remain limited until the customer responds.")
-  } else if (signals.isHighPriority) {
-    summary.push("Current case details suggest the issue should stay in active ownership.")
-  } else {
-    summary.push("Current case details suggest the next step is controlled follow-up.")
-  }
-
-  return summary.slice(0, 4)
-}
-
-function buildFakeActions(signals: AICaseSignals, aiVersion: number): string[] {
-  const actions: string[] = []
 
   if (signals.isMigrationRelated) {
-    actions.push("Review migration logs.")
+    items.push("Pattern: migration-related")
+  } else if (signals.isVisibilityIssue) {
+    items.push("Pattern: visibility-related")
+  } else if (signals.isAuthRelated) {
+    items.push("Pattern: access-related")
   }
 
-  if (signals.isVisibilityIssue) {
-    actions.push("Validate visibility scope by entity.")
+  return items.slice(0, 5)
+}
+
+function getCaseIntent(signals: AICaseSignals): AIEvidenceSignal["intent"] {
+  if (signals.blockingReason !== "" && signals.blockingReason !== "none") {
+    return "blocked"
   }
 
-  if (signals.isAuthRelated) {
-    actions.push("Compare identity and access records.")
+  if (signals.status === "Resolved") {
+    return "resolved"
   }
 
-  if (signals.needsApproval) {
-    actions.push("Review approval path before repair.")
+  return "progress"
+}
+
+function buildEventEvidenceLine(item?: ActivityTimelineItem) {
+  if (!item || typeof item.content !== "string") {
+    return null
   }
 
-  if (signals.isWaitingOnCustomer) {
-    actions.push("Request customer confirmation.")
+  const content = item.content.trim().replace(/\s+/g, " ")
+  const shortContent =
+    content.length > 112 ? `${content.slice(0, 109).trimEnd()}...` : content
+
+  switch (item.type) {
+    case "incoming":
+      return `Customer message: ${shortContent}`
+    case "outgoing":
+      return `Agent update: ${shortContent}`
+    case "comment":
+    case "internal":
+    case "internal-note":
+      return `Internal note: ${shortContent}`
+    case "status-change":
+      return `Status change: ${shortContent}`
+    case "system":
+    default:
+      return `System event: ${shortContent}`
+  }
+}
+
+function buildFakeSummary(evidenceSignal: AIEvidenceSignal): string[] {
+  const summary: string[] = []
+  const blockingReasonSummary = getBlockingReasonSummary(evidenceSignal.blockingReason)
+  const eventEvidenceLine = buildEventEvidenceLine(evidenceSignal.selectedEvent)
+
+  if (evidenceSignal.intent === "blocked") {
+    summary.push(blockingReasonSummary ?? "The case is currently blocked on a recorded constraint.")
+  } else if (evidenceSignal.intent === "resolved") {
+    summary.push("The case is resolved, and the selected activity records the closure path.")
+  } else {
+    summary.push("The case is in active progress, and the selected activity shows the current workstream.")
   }
 
-  if (signals.isEscalated) {
-    actions.push("Maintain engineering ownership.")
+  if (eventEvidenceLine) {
+    summary.push(eventEvidenceLine)
   }
 
-  if (signals.isHighPriority && !signals.isEscalated) {
-    actions.push("Send a customer update.")
+  return summary.slice(0, 2)
+}
+
+function getTimelineItemTimeValue(item?: ActivityTimelineItem) {
+  if (!item?.timestampDateTime) {
+    return Number.NEGATIVE_INFINITY
   }
 
-  const genericActions = [
-    "Update case notes.",
-    "Capture current findings.",
-  ]
+  const timeValue = new Date(item.timestampDateTime).getTime()
 
-  actions.push(genericActions[aiVersion % genericActions.length])
+  return Number.isNaN(timeValue) ? Number.NEGATIVE_INFINITY : timeValue
+}
 
-  return Array.from(new Set(actions)).slice(0, 4)
+function buildFakeActions(
+  evidenceSignal: AIEvidenceSignal,
+  timelineItems: ActivityTimelineItem[],
+): {
+  label: string
+  referenceId?: string
+}[] {
+  const actions: { label: string; referenceId?: string }[] = []
+  const selectedEvent = evidenceSignal.selectedEvent
+  const actionReferenceId = selectedEvent?.id
+  const selectedEventContent =
+    typeof selectedEvent?.content === "string"
+      ? selectedEvent.content.toLowerCase()
+      : ""
+  const blockingReasonAction = getBlockingReasonAction(evidenceSignal.blockingReason)
+  const latestCustomerMessage = [...timelineItems]
+    .reverse()
+    .find((item) => item.type === "incoming")
+  const latestAgentMessage = [...timelineItems]
+    .reverse()
+    .find((item) => item.type === "outgoing")
+  const customerIsLastSpeaker =
+    getTimelineItemTimeValue(latestCustomerMessage) >
+    getTimelineItemTimeValue(latestAgentMessage)
+  const pushAction = (label: string, referenceId = actionReferenceId) => {
+    if (actions.some((action) => action.label === label)) {
+      return
+    }
+
+    actions.push({ label, referenceId })
+  }
+
+  if (evidenceSignal.intent === "blocked") {
+    if (blockingReasonAction) {
+      pushAction(blockingReasonAction)
+    }
+
+    switch (evidenceSignal.blockingReason) {
+      case "awaiting_customer_reply":
+        pushAction("Send customer follow-up")
+        break
+      case "awaiting_customer_validation":
+        pushAction("Confirm validation steps")
+        break
+      case "awaiting_approval":
+        pushAction("Route for approval")
+        break
+      case "awaiting_engineering_fix":
+        pushAction("Check fix status")
+        break
+      default:
+        break
+    }
+
+    switch (selectedEvent?.type) {
+      case "incoming":
+        pushAction("Review customer message")
+        break
+      case "comment":
+      case "internal":
+      case "internal-note":
+        pushAction("Follow up on internal note")
+        break
+      case "status-change":
+      case "system":
+        pushAction("Verify blocker status")
+        break
+      default:
+        break
+    }
+
+    return actions.slice(0, 3)
+  }
+
+  if (evidenceSignal.intent === "resolved") {
+    if (selectedEventContent.includes("close") || selectedEventContent.includes("resolved")) {
+      pushAction("Confirm closure record")
+    }
+
+    if (selectedEvent?.type === "outgoing" || selectedEvent?.type === "incoming") {
+      pushAction("Send closure confirmation")
+    } else {
+      pushAction("Archive resolution notes")
+    }
+
+    return actions.slice(0, 2)
+  }
+
+  switch (selectedEvent?.type) {
+    case "incoming":
+      if (customerIsLastSpeaker && latestCustomerMessage) {
+        pushAction("Respond to customer", latestCustomerMessage.id)
+      } else {
+        pushAction("Wait for customer response", latestAgentMessage?.id)
+      }
+      pushAction("Confirm needed details")
+      break
+    case "outgoing":
+      pushAction("Track customer response")
+      pushAction("Continue current work")
+      break
+    case "comment":
+    case "internal":
+    case "internal-note":
+      pushAction("Continue internal follow-up")
+      pushAction("Prepare customer update")
+      break
+    case "status-change":
+    case "system":
+      pushAction("Verify current case state")
+      pushAction("Continue current work")
+      break
+    default:
+      pushAction("Continue current work")
+      break
+  }
+
+  return actions.slice(0, 3)
+}
+
+function buildTimelineReferenceLabel(item: ActivityTimelineItem) {
+  const content = typeof item.content === "string" ? item.content.trim().replace(/\s+/g, " ") : ""
+  const shortContent =
+    content.length > 72 ? `${content.slice(0, 69).trimEnd()}...` : content
+
+  switch (item.type) {
+    case "incoming":
+      return `Customer report: ${shortContent}`
+    case "outgoing":
+      return `Agent update: ${shortContent}`
+    case "comment":
+    case "internal":
+    case "internal-note":
+      return `Internal note: ${shortContent}`
+    case "status-change":
+      return `Status change: ${shortContent}`
+    case "system":
+    default:
+      return `System event: ${shortContent}`
+  }
+}
+
+function selectReferenceItems(
+  signals: AICaseSignals,
+  timelineItems: ActivityTimelineItem[],
+): ActivityTimelineItem[] {
+  const references: ActivityTimelineItem[] = []
+  const normalizedTimelineItems = [...timelineItems].reverse()
+  const caseIntent = getCaseIntent(signals)
+
+  const addReference = (item?: ActivityTimelineItem) => {
+    if (!item || references.some((reference) => reference.id === item.id)) {
+      return
+    }
+
+    references.push(item)
+  }
+
+  const findLatestTimelineItem = (
+    predicate: (item: ActivityTimelineItem, normalizedContent: string) => boolean,
+  ) =>
+    normalizedTimelineItems.find((item) => {
+      const normalizedContent =
+        typeof item.content === "string" ? item.content.toLowerCase() : ""
+
+      return predicate(item, normalizedContent)
+    })
+
+  const findLatestCustomerMessage = () =>
+    findLatestTimelineItem((item) => item.type === "incoming")
+
+  const findLatestInternalNote = () =>
+    findLatestTimelineItem((item, normalizedContent) =>
+      (item.type === "comment" || item.type === "internal" || item.type === "internal-note") &&
+      !normalizedContent.includes("new chat received")
+    )
+
+  const findMeaningfulSystemEvent = () =>
+    findLatestTimelineItem((item, normalizedContent) =>
+      (item.type === "system" || item.type === "status-change") &&
+      (
+        normalizedContent.includes("resolved") ||
+        normalizedContent.includes("restored") ||
+        normalizedContent.includes("repair") ||
+        normalizedContent.includes("remediation") ||
+        normalizedContent.includes("migration") ||
+        normalizedContent.includes("tenant") ||
+        normalizedContent.includes("sync") ||
+        normalizedContent.includes("approval")
+      )
+    )
+
+  const findResolutionEvent = () =>
+    findLatestTimelineItem((item, normalizedContent) =>
+      (
+        item.type === "status-change" ||
+        item.type === "system" ||
+        item.type === "outgoing" ||
+        item.type === "incoming"
+      ) &&
+      (
+        normalizedContent.includes("resolved") ||
+        normalizedContent.includes("restored") ||
+        normalizedContent.includes("resolution summary") ||
+        normalizedContent.includes("close the incident") ||
+        normalizedContent.includes("can close")
+      )
+    )
+
+  if (caseIntent === "blocked") {
+    if (signals.isWaitingOnCustomer) {
+      addReference(findLatestCustomerMessage())
+    }
+
+    addReference(findLatestInternalNote())
+    addReference(findMeaningfulSystemEvent())
+  } else if (caseIntent === "resolved") {
+    addReference(findResolutionEvent())
+    addReference(findLatestInternalNote())
+  } else {
+    addReference(findLatestInternalNote())
+    addReference(findLatestCustomerMessage())
+    addReference(findMeaningfulSystemEvent())
+  }
+
+  if (references.length === 0 && timelineItems.length > 0) {
+    addReference(timelineItems[timelineItems.length - 1])
+  }
+
+  return references.slice(0, 2)
+}
+
+function buildFakeReferences(referenceItems: ActivityTimelineItem[]): { id: string; label: string }[] {
+  return referenceItems.map((item) => ({
+    id: item.id,
+    label: buildTimelineReferenceLabel(item),
+  }))
 }
 
 function formatAIUpdatedLabel(updatedAt: number) {
@@ -260,11 +576,57 @@ function formatAIUpdatedLabel(updatedAt: number) {
   })}`
 }
 
-function getFakeAIRecordInsight(input: AICaseInput, aiVersion: number): AIRecordInsight {
+function getClosestScrollableParent(element: HTMLElement) {
+  let currentParent = element.parentElement
+
+  while (currentParent) {
+    const { overflowY } = window.getComputedStyle(currentParent)
+    const supportsVerticalScroll = overflowY === "auto" || overflowY === "scroll"
+
+    if (supportsVerticalScroll && currentParent.scrollHeight > currentParent.clientHeight) {
+      return currentParent
+    }
+
+    currentParent = currentParent.parentElement
+  }
+
+  return null
+}
+
+function isElementVisibleInScrollRegion(element: HTMLElement) {
+  const scrollParent = getClosestScrollableParent(element)
+  const elementRect = element.getBoundingClientRect()
+
+  if (!scrollParent) {
+    return elementRect.top >= 0 && elementRect.bottom <= window.innerHeight
+  }
+
+  const parentRect = scrollParent.getBoundingClientRect()
+
+  return (
+    elementRect.top >= parentRect.top &&
+    elementRect.bottom <= parentRect.bottom
+  )
+}
+
+function getFakeAIRecordInsight(
+  input: AICaseInput,
+  _aiVersion: number,
+  timelineItems: ActivityTimelineItem[],
+): AIRecordInsight {
   const signals = detectAICaseSignals(input)
+  const referenceItems = selectReferenceItems(signals, timelineItems)
+  const evidenceSignal: AIEvidenceSignal = {
+    intent: getCaseIntent(signals),
+    blockingReason: signals.blockingReason,
+    selectedEvent: referenceItems[0],
+  }
+
   return {
-    summary: buildFakeSummary(signals),
-    actions: buildFakeActions(signals, aiVersion),
+    signals: buildFakeSignalItems(signals),
+    summary: buildFakeSummary(evidenceSignal),
+    actions: buildFakeActions(evidenceSignal, timelineItems),
+    references: buildFakeReferences(referenceItems),
   }
 }
 
@@ -485,6 +847,8 @@ export function CaseScreenPage() {
   const [caseKpiFilter, setCaseKpiFilter] = useState<CaseListKpiFilter | null>(null)
   const [aiVersion, setAiVersion] = useState(1)
   const [aiUpdatedAt, setAiUpdatedAt] = useState(() => Date.now())
+  const [pendingTimelineReferenceId, setPendingTimelineReferenceId] = useState<string | null>(null)
+  const [highlightedTimelineItemId, setHighlightedTimelineItemId] = useState<string | null>(null)
   const [responseTargetEdited, setResponseTargetEdited] = useState(false)
   const [resolutionTargetEdited, setResolutionTargetEdited] = useState(false)
   const [touched, setTouched] = useState({
@@ -524,8 +888,14 @@ export function CaseScreenPage() {
   const aiSourceSections = viewRecordSections.filter((section) =>
     section.id === "status-ownership" || section.id === "classification"
   )
+  const selectedActivityTimelineItems =
+    activityTimelineItemsByCaseId[selectedCaseId] ?? activityTimelineItems
   const aiCaseInput = buildAICaseInput(savedRecord, aiSourceSections)
-  const aiRecordInsight = getFakeAIRecordInsight(aiCaseInput, aiVersion)
+  const aiRecordInsight = getFakeAIRecordInsight(
+    aiCaseInput,
+    aiVersion,
+    selectedActivityTimelineItems
+  )
   const aiUpdatedLabel = formatAIUpdatedLabel(aiUpdatedAt)
   const openCaseCount = cases.filter((record) => record.status !== "Resolved").length
   const waitingCaseCount = cases.filter((record) => record.status === "Waiting on customer").length
@@ -601,6 +971,41 @@ export function CaseScreenPage() {
     return matchesSearch && matchesStatus && matchesKpiFilter
   })
 
+  useEffect(() => {
+    if (recordTab !== "activity" || !pendingTimelineReferenceId) {
+      return
+    }
+
+    const target = document.getElementById(pendingTimelineReferenceId)
+
+    if (!target) {
+      setPendingTimelineReferenceId(null)
+      return
+    }
+
+    if (!isElementVisibleInScrollRegion(target)) {
+      target.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      })
+    }
+
+    setHighlightedTimelineItemId(pendingTimelineReferenceId)
+    setPendingTimelineReferenceId(null)
+  }, [pendingTimelineReferenceId, recordTab])
+
+  useEffect(() => {
+    if (!highlightedTimelineItemId) {
+      return
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setHighlightedTimelineItemId(null)
+    }, 1600)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [highlightedTimelineItemId])
+
   function resetEditState(nextDraft: CaseRecord) {
     setDraftRecord(nextDraft)
     setResponseTargetEdited(false)
@@ -615,6 +1020,16 @@ export function CaseScreenPage() {
   function refreshAIInsights() {
     setAiVersion((current) => current + 1)
     setAiUpdatedAt(Date.now())
+  }
+
+  function handleAIReferenceClick(referenceId: string) {
+    setRecordTab("activity")
+    setPendingTimelineReferenceId(referenceId)
+  }
+
+  function handleAIActionClick(referenceId: string) {
+    setRecordTab("activity")
+    setPendingTimelineReferenceId(referenceId)
   }
 
   function enterEditMode() {
@@ -731,9 +1146,9 @@ export function CaseScreenPage() {
   }
 
   return (
-    <main className="min-h-screen bg-page text-text-default [font-family:var(--font-sans)] border-t border-[var(--color-border-divider)]">
-      <PageContent width="xl">
-        {screenView === "list" ? (
+    <main className={`${screenView === "list" ? "min-h-screen" : "flex h-screen flex-col overflow-hidden"} bg-page text-text-default [font-family:var(--font-sans)] border-t border-[var(--color-border-divider)]`}>
+      {screenView === "list" ? (
+        <PageContent width="xl">
           <CasesListTemplate
             actions={
               <Button variant="primary" onClick={() => undefined}>
@@ -947,167 +1362,248 @@ export function CaseScreenPage() {
               </>
             }
           />
-        ) : mode === "view" ? (
-          <div>
-            <div className="px-[var(--space-section-sm)] pt-[var(--space-4)] pb-[var(--space-4)] md:px-[var(--space-section-md)]">
-              <Button type="button" variant="ghost" onClick={handleBackToCases}>
-                Back to cases
-              </Button>
-            </div>
-            <RecordShellBar
-              breadcrumbs={[
-                {
-                  label: "Cases",
-                  href: "#",
-                  onClick: (event) => {
-                    event.preventDefault()
-                    handleBackToCases()
-                  },
+        </PageContent>
+      ) : mode === "view" ? (
+        <>
+          <RecordShellBar
+            breadcrumbs={[
+              {
+                label: "Cases",
+                href: "#",
+                onClick: (event) => {
+                  event.preventDefault()
+                  handleBackToCases()
                 },
-              ]}
-              title={savedRecord.title}
-              recordId={savedRecord.id}
-              status={getShellStatus(savedRecord.status)}
-              metadata={
-                <>
-                  {savedRecord.customer}
-                  {" • "}
-                  {savedRecord.assignee}
-                </>
-              }
-              actions={
-                <Button variant="secondary" onClick={enterEditMode}>
-                  Edit
-                </Button>
-              }
-            />
-            <div className="px-[var(--space-section-sm)] md:px-[var(--space-section-md)] xl:pr-0">
-              <div className={`-mt-[var(--space-8)] grid items-stretch gap-y-[var(--space-section-sm)] xl:gap-x-[var(--space-8)] ${isAIDrawerOpen ? "xl:grid-cols-[minmax(0,1fr)_minmax(0,calc(var(--content-width-sm)_+_var(--control-height-sm)))]" : "xl:grid-cols-[minmax(0,1fr)_var(--control-height-sm)]"}`}>
-                <div className="min-w-0 space-y-[var(--space-4)] pt-[var(--space-8)]">
-                  <Tabs
-                    tabs={[...recordTabs]}
-                    activeTab={recordTab}
-                    onChange={(tabId) => setRecordTab(tabId as "details" | "activity")}
-                  />
+              },
+            ]}
+            title={savedRecord.title}
+            recordId={savedRecord.id}
+            status={getShellStatus(savedRecord.status)}
+            metadata={
+              <>
+                {savedRecord.customer}
+                {" • "}
+                {savedRecord.assignee}
+              </>
+            }
+            actions={
+              <Button variant="secondary" onClick={enterEditMode}>
+                Edit
+              </Button>
+            }
+          />
+          <div className="min-h-0 flex-1">
+            <div className="mx-auto flex h-full w-full max-w-[var(--content-width-xl)] min-h-0 px-[var(--space-section-sm)] md:px-[var(--space-section-md)]">
+              <div className={`grid h-full min-h-0 w-full items-stretch gap-x-[var(--space-8)] ${isAIDrawerOpen ? "xl:grid-cols-[minmax(0,1fr)_minmax(0,calc(var(--content-width-sm)_+_var(--control-height-sm)))]" : "xl:grid-cols-[minmax(0,1fr)_var(--control-height-sm)]"}`}>
+                <div className="flex min-w-0 min-h-0 flex-col py-[var(--space-section-md)]">
+                  <div className="shrink-0">
+                    <Tabs
+                      tabs={[...recordTabs]}
+                      activeTab={recordTab}
+                      onChange={(tabId) => setRecordTab(tabId as "details" | "activity")}
+                    />
+                  </div>
 
-                  <div className="min-w-0 space-y-[var(--space-4)]">
-                    {recordTab === "details" ? (
-                      viewRecordSections.map((section) =>
-                        renderCaseRecordSection({
-                          section,
-                          record: savedRecord,
-                          renderMode: "view",
-                          updateField: updateDraft,
-                          getDisplayValue,
-                        })
-                      )
-                    ) : (
-                      <ActivityTimeline items={activityTimelineItems} />
-                    )}
+                  <div className={`min-h-0 flex-1 pt-[var(--space-4)] ${recordTab === "activity" ? "overflow-hidden" : "overflow-y-auto"}`}>
+                    <div className={`min-w-0 ${recordTab === "activity" ? "h-full" : "space-y-[var(--space-4)]"}`}>
+                      {recordTab === "details" ? (
+                        viewRecordSections.map((section) =>
+                          renderCaseRecordSection({
+                            section,
+                            record: savedRecord,
+                            renderMode: "view",
+                            updateField: updateDraft,
+                            getDisplayValue,
+                          })
+                        )
+                      ) : (
+                        <ActivityTimeline
+                          items={selectedActivityTimelineItems}
+                          className="h-full"
+                          highlightedItemId={highlightedTimelineItemId}
+                          scrollListOnly
+                        />
+                      )}
+                    </div>
                   </div>
                 </div>
 
-                <Drawer
-                  open={isAIDrawerOpen}
-                  title="AI assistance"
-                  metadata={aiUpdatedLabel}
-                  subtitle="Generated from visible case details and recent activity."
-                  onToggle={() => setIsAIDrawerOpen((current) => !current)}
-                  toggleLabel={isAIDrawerOpen ? "Collapse AI assistance" : "Open AI assistance"}
-                  railLabel="AI"
-                  onClose={() => setIsAIDrawerOpen(false)}
-                  closeLabel="Close AI assistance"
-                  actions={
-                    <Link
-                      href="#"
-                      className="text-[length:var(--text-xs)] leading-[var(--leading-normal)] text-[color:var(--color-text-secondary)] hover:text-[color:var(--color-text-primary)]"
-                      onClick={(event) => {
-                        event.preventDefault()
-                        refreshAIInsights()
-                      }}
-                    >
-                      Refresh summary
-                    </Link>
-                  }
-                >
-                  <section className="space-y-[var(--space-2)]">
-                    <h3 className="m-0" style={asideTitleStyles}>
-                      Summary
-                    </h3>
-                    <ul className="list-outside list-disc space-y-[var(--space-1)] pt-[var(--space-1)] pl-[var(--space-4)] marker:text-[color:var(--color-text-secondary)]">
-                      {aiRecordInsight.summary.map((item) => (
-                        <li key={item} className="text-sm leading-normal text-[color:var(--color-text-primary)]">
-                          {item}
-                        </li>
-                      ))}
-                    </ul>
-                  </section>
+                <div className="min-h-0">
+                  <Drawer
+                    open={isAIDrawerOpen}
+                    title="AI assistance"
+                    metadata={aiUpdatedLabel}
+                    subtitle="Generated from visible case details and recent activity."
+                    onToggle={() => setIsAIDrawerOpen((current) => !current)}
+                    toggleLabel={isAIDrawerOpen ? "Collapse AI assistance" : "Open AI assistance"}
+                    railLabel="AI"
+                    onClose={() => setIsAIDrawerOpen(false)}
+                    closeLabel="Close AI assistance"
+                    actions={
+                      <Link
+                        href="#"
+                        className="text-[length:var(--text-xs)] leading-[var(--leading-normal)] text-[color:var(--color-text-secondary)] hover:text-[color:var(--color-text-primary)]"
+                        onClick={(event) => {
+                          event.preventDefault()
+                          refreshAIInsights()
+                        }}
+                      >
+                        Refresh summary
+                      </Link>
+                    }
+                  >
+                    <section className="space-y-[var(--space-2)]">
+                      <h3 className="m-0" style={asideTitleStyles}>
+                        Case signals
+                      </h3>
+                      <div className="pt-[var(--space-1)]">
+                        <div className="grid gap-x-[var(--space-3)] gap-y-[var(--space-3)] sm:grid-cols-2">
+                          {aiRecordInsight.signals.map((signal) => {
+                            const [label, value = ""] = signal.split(": ")
 
-                  <section className="space-y-[var(--space-2)]">
-                    <h3 className="m-0" style={asideTitleStyles}>
-                      Suggested actions
-                    </h3>
-                    <p className="text-[length:var(--text-xs)] leading-[var(--leading-normal)] text-[color:var(--color-text-muted)]">
-                      Suggested next steps. Review before action.
-                    </p>
-                    <ol className="list-outside list-decimal space-y-[var(--space-2)] pt-[var(--space-1)] pl-[var(--space-4)] marker:text-[color:var(--color-text-secondary)]">
-                      {aiRecordInsight.actions.map((action) => (
-                        <li key={action} className="text-sm leading-normal text-[color:var(--color-text-primary)]">
-                          {action}
-                        </li>
-                      ))}
-                    </ol>
-                  </section>
-                </Drawer>
+                            return (
+                              <div key={signal} className="min-w-0">
+                                <span className="text-[length:var(--text-meta)] leading-[var(--leading-normal)] text-[color:var(--color-text-muted)]">
+                                  {label}:
+                                </span>
+                                {" "}
+                                <span className="text-[length:var(--text-meta)] leading-[var(--leading-normal)] text-[color:var(--color-text-primary)]">
+                                  {value}
+                                </span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    </section>
+
+                    <section className="mt-[var(--space-5)] space-y-[var(--space-2)]">
+                      <h3
+                        className="m-0 text-[color:var(--color-text-primary)]"
+                        style={asideTitleStyles}
+                      >
+                        Summary
+                      </h3>
+                      <ul className="list-outside list-disc space-y-[var(--space-1)] pt-[var(--space-1)] pl-[var(--space-4)] marker:text-[color:var(--color-text-secondary)]">
+                        {aiRecordInsight.summary.map((item) => (
+                          <li key={item} className="text-sm leading-normal text-[color:var(--color-text-primary)]">
+                            {item}
+                          </li>
+                        ))}
+                      </ul>
+                      {aiRecordInsight.references.length > 0 ? (
+                        <div className="space-y-[var(--space-1)] pt-[var(--space-1)]">
+                          <p className="text-[length:var(--text-xs)] leading-[var(--leading-normal)] text-[color:var(--color-text-muted)]">
+                            Related activity
+                          </p>
+                          <div className="space-y-[var(--space-1)]">
+                            {aiRecordInsight.references.map((reference) => (
+                              selectedActivityTimelineItems.some((item) => item.id === reference.id) ? (
+                                <button
+                                  key={reference.id}
+                                  type="button"
+                                  onClick={() => handleAIReferenceClick(reference.id)}
+                                  className="block w-full cursor-pointer py-[var(--space-half)] text-left text-[length:var(--text-meta)] leading-[var(--leading-normal)] text-[color:var(--color-text-secondary)] whitespace-normal break-words underline-offset-2 transition-colors hover:text-[color:var(--color-text-primary)] hover:underline focus-visible:rounded-[var(--radius-sm)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-focus-ring)]"
+                                >
+                                  {reference.label}
+                                </button>
+                              ) : (
+                                <span
+                                  key={reference.id}
+                                  className="block w-full py-[var(--space-half)] text-left text-[length:var(--text-meta)] leading-[var(--leading-normal)] text-[color:var(--color-text-secondary)] whitespace-normal break-words"
+                                >
+                                  {reference.label}
+                                </span>
+                              )
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+                    </section>
+
+                    <section className="mt-[var(--space-6)] space-y-[var(--space-2)]">
+                      <h3
+                        className="m-0 text-[color:var(--color-text-primary)]"
+                        style={asideTitleStyles}
+                      >
+                        Suggested actions
+                      </h3>
+                      <p className="text-[length:var(--text-xs)] leading-[var(--leading-normal)] text-[color:var(--color-text-muted)]">
+                        Suggested next steps. Review before action.
+                      </p>
+                      <ol className="list-outside list-decimal space-y-[var(--space-2)] pt-[var(--space-1)] pl-[var(--space-4)] marker:text-[color:var(--color-text-secondary)]">
+                        {aiRecordInsight.actions.map((action) => (
+                          <li
+                            key={action.label}
+                            className="text-sm leading-normal text-[color:var(--color-text-primary)]"
+                          >
+                            {action.referenceId &&
+                            selectedActivityTimelineItems.some(
+                              (item) => item.id === action.referenceId
+                            ) ? (
+                              <button
+                                type="button"
+                                onClick={() => handleAIActionClick(action.referenceId!)}
+                                className="cursor-pointer text-left text-[color:inherit] underline-offset-2 transition-colors hover:text-[color:var(--color-text-primary)] hover:underline focus-visible:rounded-[var(--radius-sm)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-focus-ring)]"
+                              >
+                                {action.label}
+                              </button>
+                            ) : (
+                              action.label
+                            )}
+                          </li>
+                        ))}
+                      </ol>
+                    </section>
+                  </Drawer>
+                </div>
               </div>
             </div>
           </div>
-        ) : (
-          <div className="space-y-[var(--space-4)]">
-            <div className="px-[var(--space-section-sm)] pt-[var(--space-4)] md:px-[var(--space-section-md)]">
-              <Button type="button" variant="ghost" onClick={handleBackToCases}>
-                Back to cases
-              </Button>
+        </>
+      ) : (
+        <>
+          <RecordShellBar
+            title={draftRecord.title || "Untitled case"}
+            mode="edit"
+            recordId={draftRecord.id}
+            actions={
+              <>
+                <div className="text-xs leading-[var(--leading-normal)] font-normal text-[color:var(--color-text-muted)]">
+                  {hasUnsavedChanges ? "Unsaved changes" : ""}
+                </div>
+                <Button type="button" variant="ghost" onClick={handleCancel}>
+                  Cancel
+                </Button>
+                <Button form="case-edit-form" type="submit" variant="primary">
+                  Save
+                </Button>
+              </>
+            }
+          />
+          <div className="flex-1 min-h-0 overflow-y-auto">
+            <div className="mx-auto w-full max-w-[var(--content-width-xl)] px-[var(--space-section-sm)] py-[var(--space-section-md)] md:px-[var(--space-section-md)]">
+              <div className="mx-auto w-full max-w-[var(--content-width-md)]">
+                <form
+                  id="case-edit-form"
+                  className="space-y-[var(--space-section-md)]"
+                  onSubmit={handleSave}
+                >
+                  {editRecordSections.map((section) =>
+                    renderCaseRecordSection({
+                      section,
+                      record: draftRecord,
+                      renderMode: "edit",
+                      updateField: updateDraft,
+                      getDisplayValue,
+                    })
+                  )}
+                </form>
+              </div>
             </div>
-            <RecordShellBar
-              title={draftRecord.title || "Untitled case"}
-              mode="edit"
-              recordId={draftRecord.id}
-              actions={
-                <>
-                  <div className="text-xs leading-[var(--leading-normal)] font-normal text-[color:var(--color-text-muted)]">
-                    {hasUnsavedChanges ? "Unsaved changes" : ""}
-                  </div>
-                  <Button type="button" variant="ghost" onClick={handleCancel}>
-                    Cancel
-                  </Button>
-                  <Button form="case-edit-form" type="submit" variant="primary">
-                    Save
-                  </Button>
-                </>
-              }
-            />
-
-            <FormPageLayout>
-              <form
-                id="case-edit-form"
-                className="space-y-[var(--space-section-md)]"
-                onSubmit={handleSave}
-              >
-                {editRecordSections.map((section) =>
-                  renderCaseRecordSection({
-                    section,
-                    record: draftRecord,
-                    renderMode: "edit",
-                    updateField: updateDraft,
-                    getDisplayValue,
-                  })
-                )}
-              </form>
-            </FormPageLayout>
           </div>
-        )}
-      </PageContent>
+        </>
+      )}
     </main>
   )
 }
