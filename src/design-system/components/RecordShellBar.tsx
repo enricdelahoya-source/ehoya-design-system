@@ -21,7 +21,7 @@ import Link from "./Link"
  */
 type RecordShellBarBreadcrumb = {
   label: string
-  href: string
+  href?: string
   onClick?: MouseEventHandler<HTMLAnchorElement>
 }
 
@@ -108,6 +108,13 @@ export default function RecordShellBar({
     "font-medium",
     "text-[color:var(--color-text-muted)]",
     "hover:text-[color:var(--color-text-secondary)]",
+  ].join(" ")
+
+  const breadcrumbCurrentClasses = [
+    "text-[length:var(--text-meta)]",
+    "leading-[var(--leading-normal)]",
+    "font-normal",
+    "text-[color:var(--color-text-secondary)]",
   ].join(" ")
 
   const breadcrumbSeparatorClasses = [
@@ -208,19 +215,25 @@ export default function RecordShellBar({
         {showBreadcrumbs && breadcrumbs ? (
           <nav aria-label="Breadcrumb" className={breadcrumbRow}>
             {breadcrumbs.map((breadcrumb, index) => (
-              <span key={`${breadcrumb.label}-${breadcrumb.href}`} className="inline-flex items-center gap-[var(--space-2)]">
+              <span key={`${breadcrumb.label}-${breadcrumb.href ?? index}`} className="inline-flex items-center gap-[var(--space-2)]">
                 {index > 0 ? (
                   <span aria-hidden="true" className={breadcrumbSeparatorClasses}>
                     /
                   </span>
                 ) : null}
-                <Link
-                  href={breadcrumb.href}
-                  className={breadcrumbLinkClasses}
-                  onClick={breadcrumb.onClick}
-                >
-                  {breadcrumb.label}
-                </Link>
+                {breadcrumb.href ? (
+                  <Link
+                    href={breadcrumb.href}
+                    className={breadcrumbLinkClasses}
+                    onClick={breadcrumb.onClick}
+                  >
+                    {breadcrumb.label}
+                  </Link>
+                ) : (
+                  <span aria-current="page" className={breadcrumbCurrentClasses}>
+                    {breadcrumb.label}
+                  </span>
+                )}
               </span>
             ))}
           </nav>

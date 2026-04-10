@@ -1,5 +1,5 @@
 import type { ActivityTimelineItem } from "../design-system/components/ActivityTimeline"
-import type { CaseRecord } from "../design-system/case-record/types"
+import type { CaseRecord } from "../cases/record/types"
 
 export const INITIAL_CASE_RECORD: CaseRecord = {
   title: "Customer cannot access invoice portal",

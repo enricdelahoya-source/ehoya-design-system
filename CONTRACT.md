@@ -48,7 +48,7 @@ The goal is:
 - Extend existing components before adding new ones  
 
 ---
-
+show
 ## Layout and hierarchy
 
 - Maintain consistent spacing and rhythm  

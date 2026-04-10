@@ -1,4 +1,4 @@
-import type { ReadOnlyValueBehavior } from "../components/controls/ReadOnlyValue"
+import type { ReadOnlyValueBehavior } from "../../design-system/components/controls/ReadOnlyValue"
 
 export type CaseRecord = {
   title: string

@@ -1,32 +1,32 @@
 import { useEffect, useState } from "react"
-import CasesListTemplate from "./case-list/CasesListTemplate"
-import { renderCaseRecordSection } from "./case-record/renderers"
-import { getCaseRecordSections, STATUS_OPTIONS } from "./case-record/schema"
-import type { CaseRecord, SectionConfig } from "./case-record/types"
-import Button from "./components/Button"
-import CaseStatusBadge, { type CaseStatus } from "./components/CaseStatusBadge"
-import ActivityTimeline, { type ActivityTimelineItem } from "./components/ActivityTimeline"
-import Input from "./components/controls/Input"
-import ReadOnlyValue from "./components/controls/ReadOnlyValue"
-import Select from "./components/controls/Select"
-import Drawer from "./components/Drawer"
-import Field from "./components/fields/Field"
-import FieldGroupStack from "./components/field-groups/FieldGroupStack"
-import FormFieldGrid from "./components/field-groups/FormFieldGrid"
-import Link from "./components/Link"
-import FormPageLayout from "./components/layouts/FormPageLayout"
-import PageContent from "./components/PageContent"
-import FormSection from "./components/sections/FormSection"
-import RecordSection from "./components/sections/RecordSection"
-import RecordShellBar from "./components/RecordShellBar"
-import StatusBadge from "./components/StatusBadge"
-import Tabs from "./components/Tabs"
+import CasesListTemplate from "../cases/list/CasesListTemplate"
+import CaseRecordTemplate from "../cases/record/CaseRecordTemplate"
+import { renderCaseRecordSection } from "../cases/record/renderers"
+import { getCaseRecordSections, STATUS_OPTIONS } from "../cases/record/schema"
+import type { CaseRecord, SectionConfig } from "../cases/record/types"
+import Button from "../design-system/components/Button"
+import CaseStatusBadge, { type CaseStatus } from "../design-system/components/CaseStatusBadge"
+import ActivityTimeline, { type ActivityTimelineItem } from "../design-system/components/ActivityTimeline"
+import Input from "../design-system/components/controls/Input"
+import ReadOnlyValue from "../design-system/components/controls/ReadOnlyValue"
+import Select from "../design-system/components/controls/Select"
+import Field from "../design-system/components/fields/Field"
+import FieldGroupStack from "../design-system/components/field-groups/FieldGroupStack"
+import FormFieldGrid from "../design-system/components/field-groups/FormFieldGrid"
+import Link from "../design-system/components/Link"
+import FormPageLayout from "../design-system/components/layouts/FormPageLayout"
+import PageContent from "../design-system/components/PageContent"
+import FormSection from "../design-system/components/sections/FormSection"
+import RecordSection from "../design-system/components/sections/RecordSection"
+import RecordShellBar from "../design-system/components/RecordShellBar"
+import StatusBadge from "../design-system/components/StatusBadge"
+import Tabs from "../design-system/components/Tabs"
 import {
   activityTimelineItems,
   activityTimelineItemsByCaseId,
   EXAMPLE_CASES,
   INITIAL_CASE_RECORD,
-} from "../prototype/mockData"
+} from "./mockData"
 
 type AICaseInput = {
   caseId: string
@@ -74,12 +74,6 @@ type AIEvidenceSignal = {
   blockingReason: CaseRecord["blockingReason"]
   selectedEvent?: ActivityTimelineItem
 }
-
-type CaseListKpiFilter =
-  | "open"
-  | "waiting_on_customer"
-  | "on_hold"
-  | "high_priority"
 
 function getSuggestedTargets(severity: CaseRecord["severity"]) {
   switch (severity) {
@@ -630,11 +624,6 @@ function getFakeAIRecordInsight(
   }
 }
 
-const recordTabs = [
-  { id: "details", label: "Details" },
-  { id: "activity", label: "Activity" },
-] as const
-
 const componentTabs = [
   { id: "details", label: "Details" },
   { id: "activity", label: "Activity" },
@@ -660,12 +649,6 @@ const semanticTypeSpecimens = [
   { label: "Shell bar record id", sample: "CASE-10482", style: { fontSize: "var(--text-shellbar-record-id)", lineHeight: "var(--leading-shellbar-record-id)", fontWeight: "var(--font-weight-regular)", color: "var(--color-text-shellbar-record-id)" } },
   { label: "Shell bar dirty", sample: "Unsaved changes", style: { fontSize: "var(--text-shellbar-dirty)", lineHeight: "var(--leading-shellbar-dirty)", fontWeight: "var(--font-weight-regular)", color: "var(--color-text-shellbar-dirty)" } },
 ] as const
-
-const caseListKpiItems: {
-  id: CaseListKpiFilter
-  label: string
-  value: number
-}[] = []
 
 const surfaceColorSpecimens = [
   { label: "Page", token: "--color-page", swatch: "var(--color-page)", text: "var(--color-text-primary)", sample: "Page background" },
@@ -844,7 +827,6 @@ export function CaseScreenPage() {
   const [draftRecord, setDraftRecord] = useState(EXAMPLE_CASES[0] ?? INITIAL_CASE_RECORD)
   const [caseSearch, setCaseSearch] = useState("")
   const [caseStatusFilter, setCaseStatusFilter] = useState<"all" | CaseRecord["status"]>("all")
-  const [caseKpiFilter, setCaseKpiFilter] = useState<CaseListKpiFilter | null>(null)
   const [aiVersion, setAiVersion] = useState(1)
   const [aiUpdatedAt, setAiUpdatedAt] = useState(() => Date.now())
   const [pendingTimelineReferenceId, setPendingTimelineReferenceId] = useState<string | null>(null)
@@ -903,33 +885,18 @@ export function CaseScreenPage() {
   const highPriorityCaseCount = cases.filter(
     (record) => record.priority === "High" || record.priority === "Critical"
   ).length
-  const caseListSummaryItems = (
-    [
-      { id: "open", label: "Open", value: openCaseCount },
-      { id: "waiting_on_customer", label: "Waiting on customer", value: waitingCaseCount },
-      { id: "on_hold", label: "On hold", value: onHoldCaseCount },
-      { id: "high_priority", label: "High priority", value: highPriorityCaseCount },
-    ] satisfies typeof caseListKpiItems
-  )
+  const caseListSummaryItems = [
+    { label: "Open", value: openCaseCount },
+    { label: "Waiting on customer", value: waitingCaseCount },
+    { label: "On hold", value: onHoldCaseCount },
+    { label: "High priority", value: highPriorityCaseCount },
+  ]
   const trimmedCaseSearch = caseSearch.trim()
-  const selectedCaseKpiItem =
-    caseKpiFilter === null
-      ? undefined
-      : caseListSummaryItems.find((item) => item.id === caseKpiFilter)
   const selectedCaseStatusOption =
     caseStatusFilter === "all"
       ? undefined
       : STATUS_OPTIONS.find((option) => option.value === caseStatusFilter)
   const activeCaseFilters = [
-    ...(selectedCaseKpiItem
-      ? [
-          {
-            id: "kpi" as const,
-            label: selectedCaseKpiItem.label,
-            clear: () => setCaseKpiFilter(null),
-          },
-        ]
-      : []),
     ...(selectedCaseStatusOption
       ? [
           {
@@ -960,15 +927,7 @@ export function CaseScreenPage() {
     const matchesStatus =
       caseStatusFilter === "all" || record.status === caseStatusFilter
 
-    const matchesKpiFilter =
-      caseKpiFilter === null ||
-      (caseKpiFilter === "open" && record.status !== "Resolved") ||
-      (caseKpiFilter === "waiting_on_customer" && record.status === "Waiting on customer") ||
-      (caseKpiFilter === "on_hold" && Boolean(record.onHoldUntil)) ||
-      (caseKpiFilter === "high_priority" &&
-        (record.priority === "High" || record.priority === "Critical"))
-
-    return matchesSearch && matchesStatus && matchesKpiFilter
+    return matchesSearch && matchesStatus
   })
 
   useEffect(() => {
@@ -1019,7 +978,7 @@ export function CaseScreenPage() {
 
   function refreshAIInsights() {
     setAiVersion((current) => current + 1)
-    setAiUpdatedAt(Date.now())
+    setAiUpdatedAt(() => Date.now())
   }
 
   function handleAIReferenceClick(referenceId: string) {
@@ -1091,10 +1050,6 @@ export function CaseScreenPage() {
     updateDraft("channel", nextChannel)
   }
 
-  function toggleCaseKpiFilter(nextFilter: CaseListKpiFilter) {
-    setCaseKpiFilter((current) => current === nextFilter ? null : nextFilter)
-  }
-
   function handleBackToCases() {
     if (mode === "edit" && hasUnsavedChanges) {
       const confirmed = window.confirm("Discard unsaved changes and return to the cases list?")
@@ -1146,421 +1101,232 @@ export function CaseScreenPage() {
   }
 
   return (
-    <main className={`${screenView === "list" ? "min-h-screen" : "flex h-screen flex-col overflow-hidden"} bg-page text-text-default [font-family:var(--font-sans)] border-t border-[var(--color-border-divider)]`}>
+    <main className={`${screenView === "list" ? "min-h-screen" : "flex h-screen flex-col overflow-hidden"} bg-page text-text-default [font-family:var(--font-sans)]`}>
       {screenView === "list" ? (
-        <PageContent width="xl">
-          <CasesListTemplate
-            actions={
-              <Button variant="primary" onClick={() => undefined}>
-                Create case
-              </Button>
-            }
-            compactFilterSpacing={activeCaseFilters.length > 0 && filteredCases.length === 0}
-            resultsRegionId="case-list-results"
-            overview={caseListSummaryItems.map((item) => (
-              <button
-                key={item.label}
-                type="button"
-                onClick={() => toggleCaseKpiFilter(item.id)}
-                aria-pressed={caseKpiFilter === item.id}
-                aria-controls="case-list-results"
-                aria-label={`${caseKpiFilter === item.id ? "Clear" : "Filter by"} ${item.label.toLowerCase()} cases`}
-                className={`group rounded-[var(--radius-md)] border px-[var(--space-4)] py-[var(--space-3)] text-left transition-[background-color,border-color,opacity] duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-focus-ring)] ${
-                  caseKpiFilter === item.id
-                    ? "border-[length:var(--border-width-control-focus)] border-[var(--color-field-border-focus)] bg-[var(--color-field-bg)]"
-                    : "border-[var(--color-border-subtle)] bg-[var(--color-surface)] hover:bg-[var(--color-surface-muted)]"
-                }`}
-              >
-                <p className={`text-[length:var(--text-meta)] leading-[var(--leading-normal)] ${
-                  caseKpiFilter === item.id
-                    ? "text-[color:var(--color-text-primary)]"
-                    : "text-[color:var(--color-text-secondary)] group-hover:text-[color:var(--color-text-primary)]"
-                }`}>
-                  {item.label}
-                </p>
-                <p className={`pt-[var(--space-1)] text-xl leading-[var(--leading-snug)] text-[color:var(--color-text-primary)] ${
-                  caseKpiFilter === item.id ? "font-medium" : "font-normal"
-                }`}>
-                  {item.value}
-                </p>
-              </button>
-            ))}
-            filterControls={
-              <div className="grid gap-[var(--space-3)] md:grid-cols-[minmax(0,2fr)_minmax(12rem,0.8fr)]">
-                <Field label="Search" variant="tight">
-                  <Input
-                    size="sm"
-                    value={caseSearch}
-                    onChange={(event) => setCaseSearch(event.target.value)}
-                    placeholder="Search by case, title, customer, or assignee"
-                    aria-controls="case-list-results"
-                    aria-label="Search cases"
-                  />
-                </Field>
+        <CasesListTemplate
+          actions={
+            <Button variant="primary" onClick={() => undefined}>
+              Create case
+            </Button>
+          }
+          compactFilterSpacing={activeCaseFilters.length > 0 && filteredCases.length === 0}
+          resultsRegionId="case-list-results"
+          overview={
+            <>
+              <div aria-hidden="true" className="col-span-full h-[var(--space-4)]" />
+              {caseListSummaryItems.map((item) => (
+                <div
+                  key={item.label}
+                  className="rounded-[var(--radius-md)] border border-[var(--color-border-subtle)] bg-[var(--color-surface)] px-[var(--space-4)] py-[var(--space-3)]"
+                >
+                  <p className="text-[length:var(--text-meta)] leading-[var(--leading-normal)] text-[color:var(--color-text-secondary)]">
+                    {item.label}
+                  </p>
+                  <p className="pt-[var(--space-1)] text-xl leading-[var(--leading-snug)] font-medium text-[color:var(--color-text-primary)]">
+                    {item.value}
+                  </p>
+                </div>
+              ))}
+            </>
+          }
+          filterControls={
+            <div className="grid gap-[var(--space-3)] md:grid-cols-[minmax(0,2fr)_minmax(12rem,0.8fr)]">
+              <Field label="Search" variant="tight">
+                <Input
+                  size="sm"
+                  value={caseSearch}
+                  onChange={(event) => setCaseSearch(event.target.value)}
+                  placeholder="Search by case, title, customer, or assignee"
+                  aria-controls="case-list-results"
+                  aria-label="Search cases"
+                />
+              </Field>
 
-                <Field label="Status" variant="tight">
-                  <Select
-                    size="sm"
-                    value={caseStatusFilter}
-                    onChange={(event) => setCaseStatusFilter(event.target.value as "all" | CaseRecord["status"])}
-                    aria-controls="case-list-results"
-                    aria-label="Filter cases by status"
-                  >
-                    <option value="all">All statuses</option>
-                    {STATUS_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </Select>
-                </Field>
-              </div>
-            }
-            activeFilters={activeCaseFilters.length > 0 ? (
-              <>
-                {activeCaseFilters.map((filter) => (
-                  <div
-                    key={filter.id}
-                    role="listitem"
-                    className="inline-flex items-center gap-[var(--space-2)] rounded-[var(--radius-sm)] border border-[var(--color-border-subtle)] bg-[var(--color-surface)] px-[var(--space-2)] py-[var(--space-1)] text-[length:var(--text-meta)] leading-[var(--leading-normal)] text-[color:var(--color-text-primary)] transition-[background-color,border-color,opacity] duration-150 hover:bg-[var(--color-surface-muted)]"
-                  >
-                    <span>{filter.label}</span>
-                    <button
-                      type="button"
-                      onClick={filter.clear}
-                      className="inline-flex h-[16px] w-[16px] items-center justify-center rounded-[var(--radius-sm)] text-[color:var(--color-text-muted)] transition-colors hover:text-[color:var(--color-text-secondary)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-focus-ring)]"
-                      aria-label={`Remove filter ${filter.label}`}
-                    >
-                      <svg
-                        aria-hidden="true"
-                        viewBox="0 0 12 12"
-                        className="h-[0.75rem] w-[0.75rem]"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                      >
-                        <path d="M2.5 2.5 9.5 9.5" />
-                        <path d="M9.5 2.5 2.5 9.5" />
-                      </svg>
-                    </button>
-                  </div>
-                ))}
-
-                {activeCaseFilters.length > 1 ? (
+              <Field label="Status" variant="tight">
+                <Select
+                  size="sm"
+                  value={caseStatusFilter}
+                  onChange={(event) => setCaseStatusFilter(event.target.value as "all" | CaseRecord["status"])}
+                  aria-controls="case-list-results"
+                  aria-label="Filter cases by status"
+                >
+                  <option value="all">All statuses</option>
+                  {STATUS_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            </div>
+          }
+          activeFilters={activeCaseFilters.length > 0 ? (
+            <>
+              {activeCaseFilters.map((filter) => (
+                <div
+                  key={filter.id}
+                  role="listitem"
+                  className="inline-flex items-center gap-[var(--space-2)] rounded-[var(--radius-sm)] border border-[var(--color-border-subtle)] bg-[var(--color-surface)] px-[var(--space-2)] py-[var(--space-1)] text-[length:var(--text-meta)] leading-[var(--leading-normal)] text-[color:var(--color-text-primary)] transition-[background-color,border-color,opacity] duration-150 hover:bg-[var(--color-surface-muted)]"
+                >
+                  <span>{filter.label}</span>
                   <button
                     type="button"
-                    onClick={() => {
-                      setCaseKpiFilter(null)
-                      setCaseStatusFilter("all")
-                      setCaseSearch("")
-                    }}
-                    aria-controls="case-list-results"
-                    aria-label="Clear all active filters"
-                    className="rounded-[var(--radius-sm)] text-[length:var(--text-meta)] leading-[var(--leading-normal)] text-[color:var(--color-text-muted)] transition-colors hover:text-[color:var(--color-text-secondary)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-focus-ring)]"
+                    onClick={filter.clear}
+                    className="inline-flex h-[16px] w-[16px] items-center justify-center rounded-[var(--radius-sm)] text-[color:var(--color-text-muted)] transition-colors hover:text-[color:var(--color-text-secondary)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-focus-ring)]"
+                    aria-label={`Remove filter ${filter.label}`}
                   >
-                    Clear all
-                  </button>
-                ) : null}
-              </>
-            ) : undefined}
-            listContent={
-              <>
-                <div className="hidden grid-cols-[minmax(0,2.4fr)_minmax(10rem,1.2fr)_minmax(10rem,1fr)_minmax(8rem,0.9fr)_minmax(10rem,1fr)_minmax(9rem,0.9fr)_1.5rem] gap-[var(--space-3)] border-y border-[var(--color-border-divider)] bg-[var(--color-surface-structural-muted)] px-[var(--space-4)] py-[var(--space-3)] md:grid">
-                  {["Case", "Customer", "Status", "Priority", "Assignee", "Updated", ""].map((label, index) => (
-                    <div
-                      key={`${label}-${index}`}
-                      className={`text-[length:var(--text-meta)] leading-[var(--leading-normal)] font-medium text-[color:var(--color-text-secondary)] ${index === 6 ? "text-right" : ""}`}
+                    <svg
+                      aria-hidden="true"
+                      viewBox="0 0 12 12"
+                      className="h-[0.75rem] w-[0.75rem]"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
                     >
-                      {label}
-                    </div>
-                  ))}
+                      <path d="M2.5 2.5 9.5 9.5" />
+                      <path d="M9.5 2.5 2.5 9.5" />
+                    </svg>
+                  </button>
                 </div>
+              ))}
 
-                {filteredCases.length > 0 ? (
-                  <div className="divide-y divide-[var(--color-border-divider)]">
-                    {filteredCases.map((record) => {
-                      const priorityDisplay = getPriorityDisplay(record.priority)
-                      const statusDisplay = getCaseListStatusDisplay(record.status)
-                      const updatedDisplay = formatCaseListUpdated(record.lastUpdate)
+              {activeCaseFilters.length > 1 ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCaseStatusFilter("all")
+                    setCaseSearch("")
+                  }}
+                  aria-controls="case-list-results"
+                  aria-label="Clear all active filters"
+                  className="rounded-[var(--radius-sm)] text-[length:var(--text-meta)] leading-[var(--leading-normal)] text-[color:var(--color-text-muted)] transition-colors hover:text-[color:var(--color-text-secondary)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-focus-ring)]"
+                >
+                  Clear all
+                </button>
+              ) : null}
+            </>
+          ) : undefined}
+          listContent={
+            <>
+              <div aria-hidden="true" className="h-[var(--space-4)] bg-[var(--color-surface)]" />
+              <div className="hidden grid-cols-[minmax(0,2.4fr)_minmax(10rem,1.2fr)_minmax(10rem,1fr)_minmax(8rem,0.9fr)_minmax(10rem,1fr)_minmax(9rem,0.9fr)_1.5rem] gap-[var(--space-3)] border-y border-[var(--color-border-divider)] bg-[var(--color-surface-structural-muted)] px-[var(--space-4)] py-[var(--space-3)] md:grid">
+                {["Case", "Customer", "Status", "Priority", "Assignee", "Updated", ""].map((label, index) => (
+                  <div
+                    key={`${label}-${index}`}
+                    className={`text-[length:var(--text-meta)] leading-[var(--leading-normal)] font-medium text-[color:var(--color-text-secondary)] ${index === 6 ? "text-right" : ""}`}
+                  >
+                    {label}
+                  </div>
+                ))}
+              </div>
 
-                      return (
-                        <button
-                          key={record.id}
-                          type="button"
-                          onClick={() => openCase(record.id)}
-                          className="group grid w-full cursor-pointer gap-[var(--space-2)] bg-[var(--color-surface)] px-[var(--space-4)] py-[var(--space-4)] text-left transition-[background-color,border-color,opacity] duration-100 hover:bg-[var(--color-surface-muted)] focus-visible:bg-[var(--color-surface-muted)] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--color-focus-ring)] md:grid-cols-[minmax(0,2.4fr)_minmax(10rem,1.2fr)_minmax(10rem,1fr)_minmax(8rem,0.9fr)_minmax(10rem,1fr)_minmax(9rem,0.9fr)_1.5rem] md:items-center md:gap-[var(--space-3)]"
-                          aria-label={`Open case ${record.id}`}
-                        >
-                          <div className="min-w-0 space-y-[var(--space-half)]">
-                            <p className="text-[length:var(--text-meta)] leading-[var(--leading-normal)] text-[color:var(--color-text-secondary)] transition-colors group-hover:text-[color:var(--color-text-primary)] group-focus-visible:text-[color:var(--color-text-primary)]">
-                              {record.id}
+              {filteredCases.length > 0 ? (
+                <div className="divide-y divide-[var(--color-border-divider)]">
+                  {filteredCases.map((record) => {
+                    const priorityDisplay = getPriorityDisplay(record.priority)
+                    const statusDisplay = getCaseListStatusDisplay(record.status)
+                    const updatedDisplay = formatCaseListUpdated(record.lastUpdate)
+
+                    return (
+                      <button
+                        key={record.id}
+                        type="button"
+                        onClick={() => openCase(record.id)}
+                        className="group grid w-full cursor-pointer gap-[var(--space-2)] bg-[var(--color-surface)] px-[var(--space-4)] py-[var(--space-4)] text-left transition-[background-color,border-color,opacity] duration-100 hover:bg-[var(--color-surface-muted)] focus-visible:bg-[var(--color-surface-muted)] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--color-focus-ring)] md:grid-cols-[minmax(0,2.4fr)_minmax(10rem,1.2fr)_minmax(10rem,1fr)_minmax(8rem,0.9fr)_minmax(10rem,1fr)_minmax(9rem,0.9fr)_1.5rem] md:items-center md:gap-[var(--space-3)]"
+                        aria-label={`Open case ${record.id}`}
+                      >
+                        <div className="min-w-0 space-y-[var(--space-half)]">
+                          <p className="text-[length:var(--text-meta)] leading-[var(--leading-normal)] text-[color:var(--color-text-secondary)] transition-colors group-hover:text-[color:var(--color-text-primary)] group-focus-visible:text-[color:var(--color-text-primary)]">
+                            {record.id}
+                          </p>
+                          <div className="flex min-w-0 items-start justify-between gap-[var(--space-2)]">
+                            <p className="min-w-0 text-[length:var(--text-md)] leading-[var(--leading-normal)] font-medium text-[color:var(--color-text-primary)] transition-colors group-hover:text-[color:var(--color-text-brand)] group-focus-visible:text-[color:var(--color-text-brand)]">
+                              {record.title}
                             </p>
-                            <div className="flex min-w-0 items-start justify-between gap-[var(--space-2)]">
-                              <p className="min-w-0 text-sm leading-normal font-medium text-[color:var(--color-text-primary)] transition-colors group-hover:text-[color:var(--color-text-brand)] group-focus-visible:text-[color:var(--color-text-brand)]">
-                                {record.title}
-                              </p>
-                            </div>
                           </div>
-                          <div className="min-w-0 text-sm leading-normal text-[color:var(--color-text-primary)] transition-colors group-hover:text-[color:var(--color-text-brand)] group-focus-visible:text-[color:var(--color-text-brand)]">
-                            {getDisplayValue(record.customer)}
-                          </div>
-                          <div className={`text-sm leading-normal ${statusDisplay.className}`}>
-                            {statusDisplay.label}
-                          </div>
-                          <div className={`text-sm leading-normal ${priorityDisplay.className}`}>
-                            {priorityDisplay.label}
-                          </div>
-                          <div className="min-w-0 text-sm leading-normal text-[color:var(--color-text-primary)] transition-colors group-hover:text-[color:var(--color-text-brand)] group-focus-visible:text-[color:var(--color-text-brand)]">
-                            {getDisplayValue(record.assignee)}
-                          </div>
-                          <div className="space-y-[var(--space-half)]">
-                            <p className="text-sm leading-[var(--leading-normal)] text-[color:var(--color-text-secondary)] transition-colors group-hover:text-[color:var(--color-text-primary)] group-focus-visible:text-[color:var(--color-text-primary)]">
-                              {updatedDisplay.primary}
+                        </div>
+                        <div className="min-w-0 text-sm leading-normal text-[color:var(--color-text-primary)] transition-colors group-hover:text-[color:var(--color-text-brand)] group-focus-visible:text-[color:var(--color-text-brand)]">
+                          {getDisplayValue(record.customer)}
+                        </div>
+                        <div className={`text-sm leading-normal ${statusDisplay.className}`}>
+                          {statusDisplay.label}
+                        </div>
+                        <div className={`text-sm leading-normal ${priorityDisplay.className}`}>
+                          {priorityDisplay.label}
+                        </div>
+                        <div className="min-w-0 text-sm leading-normal text-[color:var(--color-text-primary)] transition-colors group-hover:text-[color:var(--color-text-brand)] group-focus-visible:text-[color:var(--color-text-brand)]">
+                          {getDisplayValue(record.assignee)}
+                        </div>
+                        <div className="space-y-[var(--space-half)]">
+                          <p className="text-sm leading-[var(--leading-normal)] text-[color:var(--color-text-secondary)] transition-colors group-hover:text-[color:var(--color-text-primary)] group-focus-visible:text-[color:var(--color-text-primary)]">
+                            {updatedDisplay.primary}
+                          </p>
+                          {updatedDisplay.secondary ? (
+                            <p className="text-[length:var(--text-meta)] leading-[var(--leading-normal)] text-[color:var(--color-text-muted)]">
+                              {updatedDisplay.secondary}
                             </p>
-                            {updatedDisplay.secondary ? (
-                              <p className="text-[length:var(--text-meta)] leading-[var(--leading-normal)] text-[color:var(--color-text-muted)]">
-                                {updatedDisplay.secondary}
-                              </p>
-                            ) : null}
-                          </div>
-                          <div className="hidden text-right md:block">
-                            <span
-                              aria-hidden="true"
-                              className="inline-block h-[0.5rem] w-[0.5rem] -rotate-45 border-r-2 border-b-2 border-[color:var(--color-text-muted)] transition-colors group-hover:border-[color:var(--color-text-secondary)] group-focus-visible:border-[color:var(--color-text-secondary)]"
-                            />
-                          </div>
-                        </button>
-                      )
-                    })}
-                  </div>
-                ) : (
-                  <div className="border-b border-[var(--color-border-divider)] bg-[var(--color-surface)] px-[var(--space-4)] py-[var(--space-5)]">
-                    <div className="space-y-[var(--space-3)]">
-                      <p className="text-lg leading-[var(--leading-snug)] font-medium text-[color:var(--color-text-primary)]">
-                        No cases match your filters.
-                      </p>
-                      <p className="text-[length:var(--text-meta)] leading-[var(--leading-normal)] text-[color:var(--color-text-secondary)]">
-                        Clear filters to see more cases.
-                      </p>
-                      <div className="pt-[var(--space-3)]">
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => {
-                            setCaseKpiFilter(null)
-                            setCaseStatusFilter("all")
-                            setCaseSearch("")
-                          }}
-                        >
-                          Clear filters
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </>
-            }
-          />
-        </PageContent>
-      ) : mode === "view" ? (
-        <>
-          <RecordShellBar
-            breadcrumbs={[
-              {
-                label: "Cases",
-                href: "#",
-                onClick: (event) => {
-                  event.preventDefault()
-                  handleBackToCases()
-                },
-              },
-            ]}
-            title={savedRecord.title}
-            recordId={savedRecord.id}
-            status={getShellStatus(savedRecord.status)}
-            metadata={
-              <>
-                {savedRecord.customer}
-                {" • "}
-                {savedRecord.assignee}
-              </>
-            }
-            actions={
-              <Button variant="secondary" onClick={enterEditMode}>
-                Edit
-              </Button>
-            }
-          />
-          <div className="min-h-0 flex-1">
-            <div className="mx-auto flex h-full w-full max-w-[var(--content-width-xl)] min-h-0 px-[var(--space-section-sm)] md:px-[var(--space-section-md)]">
-              <div className={`grid h-full min-h-0 w-full items-stretch gap-x-[var(--space-8)] ${isAIDrawerOpen ? "xl:grid-cols-[minmax(0,1fr)_minmax(0,calc(var(--content-width-sm)_+_var(--control-height-sm)))]" : "xl:grid-cols-[minmax(0,1fr)_var(--control-height-sm)]"}`}>
-                <div className="flex min-w-0 min-h-0 flex-col py-[var(--space-section-md)]">
-                  <div className="shrink-0">
-                    <Tabs
-                      tabs={[...recordTabs]}
-                      activeTab={recordTab}
-                      onChange={(tabId) => setRecordTab(tabId as "details" | "activity")}
-                    />
-                  </div>
-
-                  <div className={`min-h-0 flex-1 pt-[var(--space-4)] ${recordTab === "activity" ? "overflow-hidden" : "overflow-y-auto"}`}>
-                    <div className={`min-w-0 ${recordTab === "activity" ? "h-full" : "space-y-[var(--space-4)]"}`}>
-                      {recordTab === "details" ? (
-                        viewRecordSections.map((section) =>
-                          renderCaseRecordSection({
-                            section,
-                            record: savedRecord,
-                            renderMode: "view",
-                            updateField: updateDraft,
-                            getDisplayValue,
-                          })
-                        )
-                      ) : (
-                        <ActivityTimeline
-                          items={selectedActivityTimelineItems}
-                          className="h-full"
-                          highlightedItemId={highlightedTimelineItemId}
-                          scrollListOnly
-                        />
-                      )}
-                    </div>
-                  </div>
+                          ) : null}
+                        </div>
+                        <div className="hidden text-right md:block">
+                          <span
+                            aria-hidden="true"
+                            className="inline-block h-[0.5rem] w-[0.5rem] -rotate-45 border-r-2 border-b-2 border-[color:var(--color-text-muted)] transition-colors group-hover:border-[color:var(--color-text-secondary)] group-focus-visible:border-[color:var(--color-text-secondary)]"
+                          />
+                        </div>
+                      </button>
+                    )
+                  })}
                 </div>
-
-                <div className="min-h-0">
-                  <Drawer
-                    open={isAIDrawerOpen}
-                    title="AI assistance"
-                    metadata={aiUpdatedLabel}
-                    subtitle="Generated from visible case details and recent activity."
-                    onToggle={() => setIsAIDrawerOpen((current) => !current)}
-                    toggleLabel={isAIDrawerOpen ? "Collapse AI assistance" : "Open AI assistance"}
-                    railLabel="AI"
-                    onClose={() => setIsAIDrawerOpen(false)}
-                    closeLabel="Close AI assistance"
-                    actions={
-                      <Link
-                        href="#"
-                        className="text-[length:var(--text-xs)] leading-[var(--leading-normal)] text-[color:var(--color-text-secondary)] hover:text-[color:var(--color-text-primary)]"
-                        onClick={(event) => {
-                          event.preventDefault()
-                          refreshAIInsights()
+              ) : (
+                <div className="border-b border-[var(--color-border-divider)] bg-[var(--color-surface)] px-[var(--space-4)] py-[var(--space-5)]">
+                  <div className="space-y-[var(--space-3)]">
+                    <p className="text-lg leading-[var(--leading-snug)] font-medium text-[color:var(--color-text-primary)]">
+                      No cases match your filters.
+                    </p>
+                    <p className="text-[length:var(--text-meta)] leading-[var(--leading-normal)] text-[color:var(--color-text-secondary)]">
+                      Clear filters to see more cases.
+                    </p>
+                    <div className="pt-[var(--space-3)]">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => {
+                          setCaseStatusFilter("all")
+                          setCaseSearch("")
                         }}
                       >
-                        Refresh summary
-                      </Link>
-                    }
-                  >
-                    <section className="space-y-[var(--space-2)]">
-                      <h3 className="m-0" style={asideTitleStyles}>
-                        Case signals
-                      </h3>
-                      <div className="pt-[var(--space-1)]">
-                        <div className="grid gap-x-[var(--space-3)] gap-y-[var(--space-3)] sm:grid-cols-2">
-                          {aiRecordInsight.signals.map((signal) => {
-                            const [label, value = ""] = signal.split(": ")
-
-                            return (
-                              <div key={signal} className="min-w-0">
-                                <span className="text-[length:var(--text-meta)] leading-[var(--leading-normal)] text-[color:var(--color-text-muted)]">
-                                  {label}:
-                                </span>
-                                {" "}
-                                <span className="text-[length:var(--text-meta)] leading-[var(--leading-normal)] text-[color:var(--color-text-primary)]">
-                                  {value}
-                                </span>
-                              </div>
-                            )
-                          })}
-                        </div>
-                      </div>
-                    </section>
-
-                    <section className="mt-[var(--space-5)] space-y-[var(--space-2)]">
-                      <h3
-                        className="m-0 text-[color:var(--color-text-primary)]"
-                        style={asideTitleStyles}
-                      >
-                        Summary
-                      </h3>
-                      <ul className="list-outside list-disc space-y-[var(--space-1)] pt-[var(--space-1)] pl-[var(--space-4)] marker:text-[color:var(--color-text-secondary)]">
-                        {aiRecordInsight.summary.map((item) => (
-                          <li key={item} className="text-sm leading-normal text-[color:var(--color-text-primary)]">
-                            {item}
-                          </li>
-                        ))}
-                      </ul>
-                      {aiRecordInsight.references.length > 0 ? (
-                        <div className="space-y-[var(--space-1)] pt-[var(--space-1)]">
-                          <p className="text-[length:var(--text-xs)] leading-[var(--leading-normal)] text-[color:var(--color-text-muted)]">
-                            Related activity
-                          </p>
-                          <div className="space-y-[var(--space-1)]">
-                            {aiRecordInsight.references.map((reference) => (
-                              selectedActivityTimelineItems.some((item) => item.id === reference.id) ? (
-                                <button
-                                  key={reference.id}
-                                  type="button"
-                                  onClick={() => handleAIReferenceClick(reference.id)}
-                                  className="block w-full cursor-pointer py-[var(--space-half)] text-left text-[length:var(--text-meta)] leading-[var(--leading-normal)] text-[color:var(--color-text-secondary)] whitespace-normal break-words underline-offset-2 transition-colors hover:text-[color:var(--color-text-primary)] hover:underline focus-visible:rounded-[var(--radius-sm)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-focus-ring)]"
-                                >
-                                  {reference.label}
-                                </button>
-                              ) : (
-                                <span
-                                  key={reference.id}
-                                  className="block w-full py-[var(--space-half)] text-left text-[length:var(--text-meta)] leading-[var(--leading-normal)] text-[color:var(--color-text-secondary)] whitespace-normal break-words"
-                                >
-                                  {reference.label}
-                                </span>
-                              )
-                            ))}
-                          </div>
-                        </div>
-                      ) : null}
-                    </section>
-
-                    <section className="mt-[var(--space-6)] space-y-[var(--space-2)]">
-                      <h3
-                        className="m-0 text-[color:var(--color-text-primary)]"
-                        style={asideTitleStyles}
-                      >
-                        Suggested actions
-                      </h3>
-                      <p className="text-[length:var(--text-xs)] leading-[var(--leading-normal)] text-[color:var(--color-text-muted)]">
-                        Suggested next steps. Review before action.
-                      </p>
-                      <ol className="list-outside list-decimal space-y-[var(--space-2)] pt-[var(--space-1)] pl-[var(--space-4)] marker:text-[color:var(--color-text-secondary)]">
-                        {aiRecordInsight.actions.map((action) => (
-                          <li
-                            key={action.label}
-                            className="text-sm leading-normal text-[color:var(--color-text-primary)]"
-                          >
-                            {action.referenceId &&
-                            selectedActivityTimelineItems.some(
-                              (item) => item.id === action.referenceId
-                            ) ? (
-                              <button
-                                type="button"
-                                onClick={() => handleAIActionClick(action.referenceId!)}
-                                className="cursor-pointer text-left text-[color:inherit] underline-offset-2 transition-colors hover:text-[color:var(--color-text-primary)] hover:underline focus-visible:rounded-[var(--radius-sm)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-focus-ring)]"
-                              >
-                                {action.label}
-                              </button>
-                            ) : (
-                              action.label
-                            )}
-                          </li>
-                        ))}
-                      </ol>
-                    </section>
-                  </Drawer>
+                        Clear filters
+                      </Button>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
-          </div>
-        </>
+              )}
+            </>
+          }
+        />
+      ) : mode === "view" ? (
+        <CaseRecordTemplate
+          record={savedRecord}
+          status={getShellStatus(savedRecord.status)}
+          sections={viewRecordSections}
+          updateField={updateDraft}
+          getDisplayValue={getDisplayValue}
+          recordTab={recordTab}
+          onRecordTabChange={(tab) => setRecordTab(tab)}
+          onBackToCases={handleBackToCases}
+          onEnterEditMode={enterEditMode}
+          selectedActivityTimelineItems={selectedActivityTimelineItems}
+          highlightedTimelineItemId={highlightedTimelineItemId}
+          isAIDrawerOpen={isAIDrawerOpen}
+          onToggleAIDrawer={() => setIsAIDrawerOpen((current) => !current)}
+          onCloseAIDrawer={() => setIsAIDrawerOpen(false)}
+          aiUpdatedLabel={aiUpdatedLabel}
+          aiRecordInsight={aiRecordInsight}
+          onRefreshAIInsights={refreshAIInsights}
+          onAIReferenceClick={handleAIReferenceClick}
+          onAIActionClick={handleAIActionClick}
+        />
       ) : (
         <>
           <RecordShellBar

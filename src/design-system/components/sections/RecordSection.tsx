@@ -16,18 +16,13 @@ export default function RecordSection({
 }: RecordSectionProps) {
   const titleId = useId()
 
-  const sectionClasses = [
-    "pt-[var(--space-5)]",
-    className,
-  ]
-    .filter(Boolean)
-    .join(" ")
+  const sectionClasses = [className].filter(Boolean).join(" ")
 
   const innerClasses = [
-    "space-y-[var(--space-stack-sm)]",
+    "space-y-[var(--space-3)]",
     "border-b",
     "border-[var(--color-border-divider)]",
-    "pb-[var(--space-5)]",
+    "pb-[var(--space-6)]",
   ].join(" ")
 
   const headerClasses = [
@@ -53,7 +48,7 @@ export default function RecordSection({
     "text-[color:var(--color-text-secondary)]",
   ].join(" ")
 
-  const contentClasses = ["pt-[var(--space-4)]"].join(" ")
+  const contentClasses = [""].join(" ")
 
   return (
     <section aria-labelledby={titleId} className={sectionClasses}>

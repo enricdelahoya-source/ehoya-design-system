@@ -1,13 +1,13 @@
-import Input from "../components/controls/Input"
-import ReadOnlyValue from "../components/controls/ReadOnlyValue"
-import Select from "../components/controls/Select"
-import Textarea from "../components/controls/Textarea"
-import Field from "../components/fields/Field"
-import FieldGroupStack from "../components/field-groups/FieldGroupStack"
-import FormFieldGrid from "../components/field-groups/FormFieldGrid"
-import RecordFieldGrid from "../components/field-groups/RecordFieldGrid"
-import FormSection from "../components/sections/FormSection"
-import RecordSection from "../components/sections/RecordSection"
+import Input from "../../design-system/components/controls/Input"
+import ReadOnlyValue from "../../design-system/components/controls/ReadOnlyValue"
+import Select from "../../design-system/components/controls/Select"
+import Textarea from "../../design-system/components/controls/Textarea"
+import Field from "../../design-system/components/fields/Field"
+import FieldGroupStack from "../../design-system/components/field-groups/FieldGroupStack"
+import FormFieldGrid from "../../design-system/components/field-groups/FormFieldGrid"
+import RecordFieldGrid from "../../design-system/components/field-groups/RecordFieldGrid"
+import FormSection from "../../design-system/components/sections/FormSection"
+import RecordSection from "../../design-system/components/sections/RecordSection"
 import type {
   CaseRecord,
   FieldConfig,
