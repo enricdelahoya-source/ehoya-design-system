@@ -9,7 +9,6 @@ import CaseStatusBadge, { type CaseStatus } from "../design-system/components/Ca
 import ActivityTimeline, { type ActivityTimelineItem } from "../design-system/components/ActivityTimeline"
 import Input from "../design-system/components/controls/Input"
 import ReadOnlyValue from "../design-system/components/controls/ReadOnlyValue"
-import Select from "../design-system/components/controls/Select"
 import Field from "../design-system/components/fields/Field"
 import FieldGroupStack from "../design-system/components/field-groups/FieldGroupStack"
 import FormFieldGrid from "../design-system/components/field-groups/FormFieldGrid"
@@ -20,6 +19,7 @@ import FormSection from "../design-system/components/sections/FormSection"
 import RecordSection from "../design-system/components/sections/RecordSection"
 import RecordShellBar from "../design-system/components/RecordShellBar"
 import StatusBadge from "../design-system/components/StatusBadge"
+import SummaryCard from "../design-system/components/SummaryCard"
 import Tabs from "../design-system/components/Tabs"
 import {
   activityTimelineItems,
@@ -817,16 +817,217 @@ function formatCaseListUpdated(value: string) {
   }
 }
 
+type CaseSortColumn = "updated" | "priority"
+type CaseSortDirection = "asc" | "desc"
+
+const CASES_LIST_GRID_COLUMNS =
+  "md:grid-cols-[minmax(0,2.4fr)_minmax(10rem,1.2fr)_minmax(10rem,1fr)_minmax(8rem,0.9fr)_minmax(10rem,1fr)_minmax(9rem,0.9fr)_1.5rem]"
+
+function getCaseUpdatedSortValue(value: string) {
+  const trimmed = value.trim()
+
+  if (!trimmed) {
+    return 0
+  }
+
+  const [datePart, timePart] = trimmed.split(" ")
+
+  if (!datePart) {
+    return 0
+  }
+
+  const normalizedTime =
+    timePart && /^\d{2}:\d{2}$/.test(timePart) ? timePart : "00:00"
+  const parsedDate = new Date(`${datePart}T${normalizedTime}:00`)
+
+  if (Number.isNaN(parsedDate.getTime())) {
+    return 0
+  }
+
+  return parsedDate.getTime()
+}
+
+function getCasePrioritySortValue(priority: CaseRecord["priority"]) {
+  switch (priority) {
+    case "Critical":
+      return 4
+    case "High":
+      return 3
+    case "Medium":
+      return 2
+    case "Low":
+      return 1
+    case "":
+    default:
+      return 0
+  }
+}
+
+function compareCasesByUpdatedDescending(a: CaseRecord, b: CaseRecord) {
+  return getCaseUpdatedSortValue(b.lastUpdate) - getCaseUpdatedSortValue(a.lastUpdate)
+}
+
+function compareCasesByPriority(
+  a: CaseRecord,
+  b: CaseRecord,
+  direction: CaseSortDirection
+) {
+  const priorityDiff =
+    getCasePrioritySortValue(a.priority) - getCasePrioritySortValue(b.priority)
+
+  if (priorityDiff !== 0) {
+    return direction === "desc" ? -priorityDiff : priorityDiff
+  }
+
+  return compareCasesByUpdatedDescending(a, b)
+}
+
+function formatCaseTimestamp(date: Date) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Madrid",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(date)
+
+  const formattedParts = Object.fromEntries(
+    parts
+      .filter((part) => part.type !== "literal")
+      .map((part) => [part.type, part.value])
+  )
+
+  return `${formattedParts.year}-${formattedParts.month}-${formattedParts.day} ${formattedParts.hour}:${formattedParts.minute} CET`
+}
+
+function TableChevronIcon({
+  direction,
+  className = "",
+}: {
+  direction: "up" | "down" | "right"
+  className?: string
+}) {
+  const directionClassName =
+    direction === "up"
+      ? "rotate-180"
+      : direction === "right"
+        ? "-rotate-90"
+        : ""
+
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 12 12"
+      className={`h-[0.75rem] w-[0.75rem] ${directionClassName} ${className}`.trim()}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M2.5 4.25 6 7.75 9.5 4.25" />
+    </svg>
+  )
+}
+
+function SortIndicator({
+  active,
+  direction,
+}: {
+  active: boolean
+  direction: CaseSortDirection
+}) {
+  if (active) {
+    return (
+      <span className="inline-flex h-[0.875rem] w-[0.875rem] items-center justify-center text-[color:var(--color-text-muted)]">
+        <TableChevronIcon direction={direction === "asc" ? "up" : "down"} />
+      </span>
+    )
+  }
+
+  return (
+    <span className="inline-flex h-[0.875rem] w-[0.875rem] flex-col items-center justify-center text-[color:var(--color-text-muted)] opacity-60">
+      <TableChevronIcon direction="up" className="h-[0.5rem] w-[0.5rem]" />
+      <TableChevronIcon direction="down" className="-mt-[0.1875rem] h-[0.5rem] w-[0.5rem]" />
+    </span>
+  )
+}
+
+function getNextCaseId(cases: CaseRecord[]) {
+  const maxCaseNumber = cases.reduce((currentMax, record) => {
+    const nextNumber = Number.parseInt(record.id.replace("CASE-", ""), 10)
+
+    if (Number.isNaN(nextNumber)) {
+      return currentMax
+    }
+
+    return Math.max(currentMax, nextNumber)
+  }, 0)
+
+  return `CASE-${String(maxCaseNumber + 1).padStart(5, "0")}`
+}
+
+function buildNewCaseRecord(): CaseRecord {
+  return {
+    ...INITIAL_CASE_RECORD,
+    id: "",
+    title: "Customer cannot update invoice recipient after clinic transfer",
+    status: "New",
+    blockingReason: "",
+    priority: "Medium",
+    assignee: "Lucia Fernandez",
+    queue: "General Support",
+    statusReason: "",
+    onHoldUntil: "",
+    channel: "Email",
+    severity: "Minor",
+    productArea: "",
+    category: "",
+    region: "Southern Europe",
+    source: "Support intake",
+    timelinePolicy: "Standard Support",
+    responseTarget: "",
+    resolutionTarget: "",
+    firstResponse: "",
+    lastUpdate: "",
+    slaStatus: "On track",
+    breachRisk: "Low",
+    customer: INITIAL_CASE_RECORD.customer,
+    contact: "",
+    email: "",
+    accountTier: "",
+    contractType: "",
+    routingGroup: "General Support",
+    approvalRequired: "No",
+    approvalReason: "",
+    description: "",
+    internalNotes: "",
+    emailThreadId: "",
+    callReference: "",
+    chatSessionId: "",
+  }
+}
+
 export function CaseScreenPage() {
   const [recordTab, setRecordTab] = useState<"details" | "activity">("details")
   const [screenView, setScreenView] = useState<"list" | "record">("list")
   const [mode, setMode] = useState<"view" | "edit">("view")
-  const [isAIDrawerOpen, setIsAIDrawerOpen] = useState(false)
+  const [isAIDrawerOpen, setIsAIDrawerOpen] = useState(true)
   const [cases, setCases] = useState(EXAMPLE_CASES)
   const [selectedCaseId, setSelectedCaseId] = useState(EXAMPLE_CASES[0]?.id ?? "")
   const [draftRecord, setDraftRecord] = useState(EXAMPLE_CASES[0] ?? INITIAL_CASE_RECORD)
   const [caseSearch, setCaseSearch] = useState("")
-  const [caseStatusFilter, setCaseStatusFilter] = useState<"all" | CaseRecord["status"]>("all")
+  const [caseStatusFilter, setCaseStatusFilter] = useState<CaseRecord["status"] | null>(null)
+  const [caseSort, setCaseSort] = useState<{
+    column: CaseSortColumn
+    direction: CaseSortDirection
+  }>({
+    column: "updated",
+    direction: "desc",
+  })
+  const [createCaseBaseline, setCreateCaseBaseline] = useState<CaseRecord | null>(null)
   const [aiVersion, setAiVersion] = useState(1)
   const [aiUpdatedAt, setAiUpdatedAt] = useState(() => Date.now())
   const [pendingTimelineReferenceId, setPendingTimelineReferenceId] = useState<string | null>(null)
@@ -836,26 +1037,35 @@ export function CaseScreenPage() {
   const [touched, setTouched] = useState({
     title: false,
     priority: false,
+    customer: false,
   })
   const [saveAttempted, setSaveAttempted] = useState(false)
+  const isCreatingCase = createCaseBaseline !== null
+  const selectedCase =
+    cases.find((record) => record.id === selectedCaseId) ?? null
   const savedRecord =
-    cases.find((record) => record.id === selectedCaseId) ??
+    (isCreatingCase ? createCaseBaseline : selectedCase) ??
     cases[0] ??
     INITIAL_CASE_RECORD
 
   const hasUnsavedChanges =
-    JSON.stringify(savedRecord) !== JSON.stringify(draftRecord)
+    JSON.stringify(isCreatingCase ? createCaseBaseline : savedRecord) !==
+    JSON.stringify(draftRecord)
 
   const titleError = draftRecord.title.trim() ? undefined : "Title is required"
-  const priorityError = draftRecord.priority ? undefined : "Priority is required"
+  const customerError = draftRecord.customer.trim() ? undefined : "Customer is required"
+  const priorityError =
+    isCreatingCase || draftRecord.priority ? undefined : "Priority is required"
 
   const visibleTitleError =
     touched.title || saveAttempted ? titleError : undefined
+  const visibleCustomerError =
+    touched.customer || saveAttempted ? customerError : undefined
   const visiblePriorityError =
     touched.priority || saveAttempted ? priorityError : undefined
 
   const viewRecordSections = getCaseRecordSections(savedRecord)
-  const editRecordSections = getCaseRecordSections(draftRecord, {
+  const baseEditRecordSections = getCaseRecordSections(draftRecord, {
     visibleTitleError,
     visiblePriorityError,
     markTitleTouched: () => markTouched("title"),
@@ -867,6 +1077,30 @@ export function CaseScreenPage() {
     onResponseTargetEdit: () => setResponseTargetEdited(true),
     onResolutionTargetEdit: () => setResolutionTargetEdited(true),
   })
+  const editRecordSections = baseEditRecordSections.map((section) => ({
+    ...section,
+    fields: section.fields.map((field) => {
+      if (field.key === "customer") {
+        return {
+          ...field,
+          required: isCreatingCase,
+          error: visibleCustomerError,
+          onBlur: isCreatingCase ? () => markTouched("customer") : field.onBlur,
+        }
+      }
+
+      if (field.key === "priority" && isCreatingCase) {
+        return {
+          ...field,
+          required: false,
+          error: undefined,
+          onBlur: undefined,
+        }
+      }
+
+      return field
+    }),
+  }))
   const aiSourceSections = viewRecordSections.filter((section) =>
     section.id === "status-ownership" || section.id === "classification"
   )
@@ -879,33 +1113,13 @@ export function CaseScreenPage() {
     selectedActivityTimelineItems
   )
   const aiUpdatedLabel = formatAIUpdatedLabel(aiUpdatedAt)
-  const openCaseCount = cases.filter((record) => record.status !== "Resolved").length
-  const waitingCaseCount = cases.filter((record) => record.status === "Waiting on customer").length
-  const onHoldCaseCount = cases.filter((record) => Boolean(record.onHoldUntil)).length
-  const highPriorityCaseCount = cases.filter(
-    (record) => record.priority === "High" || record.priority === "Critical"
-  ).length
-  const caseListSummaryItems = [
-    { label: "Open", value: openCaseCount },
-    { label: "Waiting on customer", value: waitingCaseCount },
-    { label: "On hold", value: onHoldCaseCount },
-    { label: "High priority", value: highPriorityCaseCount },
-  ]
+  const caseListSummaryItems = STATUS_OPTIONS.map((option) => ({
+    value: option.value as CaseRecord["status"],
+    label: option.label,
+    count: cases.filter((record) => record.status === option.value).length,
+  }))
   const trimmedCaseSearch = caseSearch.trim()
-  const selectedCaseStatusOption =
-    caseStatusFilter === "all"
-      ? undefined
-      : STATUS_OPTIONS.find((option) => option.value === caseStatusFilter)
   const activeCaseFilters = [
-    ...(selectedCaseStatusOption
-      ? [
-          {
-            id: "status" as const,
-            label: `Status: ${selectedCaseStatusOption.label}`,
-            clear: () => setCaseStatusFilter("all"),
-          },
-        ]
-      : []),
     ...(trimmedCaseSearch !== ""
       ? [
           {
@@ -916,6 +1130,8 @@ export function CaseScreenPage() {
         ]
       : []),
   ]
+  const showClearAllCaseFilters =
+    activeCaseFilters.length > 0 && caseStatusFilter !== null
   const filteredCases = cases.filter((record) => {
     const matchesSearch =
       trimmedCaseSearch === "" ||
@@ -925,9 +1141,18 @@ export function CaseScreenPage() {
         .includes(trimmedCaseSearch.toLowerCase())
 
     const matchesStatus =
-      caseStatusFilter === "all" || record.status === caseStatusFilter
+      caseStatusFilter === null || record.status === caseStatusFilter
 
     return matchesSearch && matchesStatus
+  })
+  const sortedCases = [...filteredCases].sort((a, b) => {
+    if (caseSort.column === "priority") {
+      return compareCasesByPriority(a, b, caseSort.direction)
+    }
+
+    const updatedDiff = compareCasesByUpdatedDescending(a, b)
+
+    return caseSort.direction === "desc" ? updatedDiff : -updatedDiff
   })
 
   useEffect(() => {
@@ -972,6 +1197,7 @@ export function CaseScreenPage() {
     setTouched({
       title: false,
       priority: false,
+      customer: false,
     })
     setSaveAttempted(false)
   }
@@ -995,6 +1221,7 @@ export function CaseScreenPage() {
     resetEditState(savedRecord)
     setRecordTab("details")
     setIsAIDrawerOpen(false)
+    setCreateCaseBaseline(null)
     setMode("edit")
   }
 
@@ -1008,13 +1235,26 @@ export function CaseScreenPage() {
     setSelectedCaseId(caseId)
     resetEditState(nextCase)
     setRecordTab("details")
-    setIsAIDrawerOpen(false)
+    setIsAIDrawerOpen(true)
+    setCreateCaseBaseline(null)
     setMode("view")
     setScreenView("record")
     refreshAIInsights()
   }
 
-  function markTouched(field: "title" | "priority") {
+  function handleCreateCase() {
+    const nextCase = buildNewCaseRecord()
+
+    setSelectedCaseId("")
+    setCreateCaseBaseline(nextCase)
+    resetEditState(nextCase)
+    setRecordTab("details")
+    setIsAIDrawerOpen(false)
+    setMode("edit")
+    setScreenView("record")
+  }
+
+  function markTouched(field: "title" | "priority" | "customer") {
     setTouched((current) => ({
       ...current,
       [field]: true,
@@ -1050,6 +1290,22 @@ export function CaseScreenPage() {
     updateDraft("channel", nextChannel)
   }
 
+  function handleCaseSort(column: CaseSortColumn) {
+    setCaseSort((current) => {
+      if (current.column === column) {
+        return {
+          column,
+          direction: current.direction === "desc" ? "asc" : "desc",
+        }
+      }
+
+      return {
+        column,
+        direction: "desc",
+      }
+    })
+  }
+
   function handleBackToCases() {
     if (mode === "edit" && hasUnsavedChanges) {
       const confirmed = window.confirm("Discard unsaved changes and return to the cases list?")
@@ -1062,6 +1318,7 @@ export function CaseScreenPage() {
       setMode("view")
     }
 
+    setCreateCaseBaseline(null)
     setScreenView("list")
   }
 
@@ -1074,6 +1331,14 @@ export function CaseScreenPage() {
       }
     }
 
+    if (isCreatingCase) {
+      setCreateCaseBaseline(null)
+      resetEditState(draftRecord)
+      setScreenView("list")
+      setMode("view")
+      return
+    }
+
     resetEditState(savedRecord)
     setMode("view")
   }
@@ -1084,49 +1349,73 @@ export function CaseScreenPage() {
     setTouched({
       title: true,
       priority: true,
+      customer: true,
     })
 
-    if (titleError || priorityError) {
+    if (titleError || customerError || priorityError) {
       return
     }
 
-    setCases((currentCases) =>
-      currentCases.map((record) => (
-        record.id === savedRecord.id ? draftRecord : record
-      ))
-    )
-    resetEditState(draftRecord)
+    const nextRecord = isCreatingCase
+      ? {
+          ...draftRecord,
+          id: getNextCaseId(cases),
+          lastUpdate: formatCaseTimestamp(new Date()),
+        }
+      : draftRecord
+
+    if (isCreatingCase) {
+      setCases((currentCases) => [nextRecord, ...currentCases])
+      setSelectedCaseId(nextRecord.id)
+      setCreateCaseBaseline(null)
+    } else {
+      setCases((currentCases) =>
+        currentCases.map((record) => (
+          record.id === savedRecord.id ? nextRecord : record
+        ))
+      )
+    }
+
+    resetEditState(nextRecord)
     setMode("view")
     refreshAIInsights()
   }
+
+  const canCreateCase =
+    draftRecord.title.trim() !== "" && draftRecord.customer.trim() !== ""
 
   return (
     <main className={`${screenView === "list" ? "min-h-screen" : "flex h-screen flex-col overflow-hidden"} bg-page text-text-default [font-family:var(--font-sans)]`}>
       {screenView === "list" ? (
         <CasesListTemplate
           actions={
-            <Button variant="primary" onClick={() => undefined}>
+            <Button variant="primary" onClick={handleCreateCase}>
               Create case
             </Button>
           }
-          compactFilterSpacing={activeCaseFilters.length > 0 && filteredCases.length === 0}
+          compactFilterSpacing={
+            (activeCaseFilters.length > 0 || caseStatusFilter !== null) && filteredCases.length === 0
+          }
           resultsRegionId="case-list-results"
           overview={
             <>
               <div aria-hidden="true" className="col-span-full h-[var(--space-4)]" />
-              {caseListSummaryItems.map((item) => (
-                <div
-                  key={item.label}
-                  className="rounded-[var(--radius-md)] border border-[var(--color-border-subtle)] bg-[var(--color-surface)] px-[var(--space-4)] py-[var(--space-3)]"
-                >
-                  <p className="text-[length:var(--text-meta)] leading-[var(--leading-normal)] text-[color:var(--color-text-secondary)]">
-                    {item.label}
-                  </p>
-                  <p className="pt-[var(--space-1)] text-xl leading-[var(--leading-snug)] font-medium text-[color:var(--color-text-primary)]">
-                    {item.value}
-                  </p>
-                </div>
-              ))}
+              <div className="col-span-full flex flex-nowrap gap-[var(--space-2)] overflow-x-auto">
+                {caseListSummaryItems.map((item) => (
+                  <SummaryCard
+                    key={item.value}
+                    label={item.label}
+                    value={item.count}
+                    selected={caseStatusFilter === item.value}
+                    aria-controls="case-list-results"
+                    onClick={() => {
+                      setCaseStatusFilter((current) => (
+                        current === item.value ? null : item.value
+                      ))
+                    }}
+                  />
+                ))}
+              </div>
             </>
           }
           filterControls={
@@ -1140,23 +1429,6 @@ export function CaseScreenPage() {
                   aria-controls="case-list-results"
                   aria-label="Search cases"
                 />
-              </Field>
-
-              <Field label="Status" variant="tight">
-                <Select
-                  size="sm"
-                  value={caseStatusFilter}
-                  onChange={(event) => setCaseStatusFilter(event.target.value as "all" | CaseRecord["status"])}
-                  aria-controls="case-list-results"
-                  aria-label="Filter cases by status"
-                >
-                  <option value="all">All statuses</option>
-                  {STATUS_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </Select>
               </Field>
             </div>
           }
@@ -1191,11 +1463,11 @@ export function CaseScreenPage() {
                 </div>
               ))}
 
-              {activeCaseFilters.length > 1 ? (
+              {showClearAllCaseFilters ? (
                 <button
                   type="button"
                   onClick={() => {
-                    setCaseStatusFilter("all")
+                    setCaseStatusFilter(null)
                     setCaseSearch("")
                   }}
                   aria-controls="case-list-results"
@@ -1210,20 +1482,47 @@ export function CaseScreenPage() {
           listContent={
             <>
               <div aria-hidden="true" className="h-[var(--space-4)] bg-[var(--color-surface)]" />
-              <div className="hidden grid-cols-[minmax(0,2.4fr)_minmax(10rem,1.2fr)_minmax(10rem,1fr)_minmax(8rem,0.9fr)_minmax(10rem,1fr)_minmax(9rem,0.9fr)_1.5rem] gap-[var(--space-3)] border-y border-[var(--color-border-divider)] bg-[var(--color-surface-structural-muted)] px-[var(--space-4)] py-[var(--space-3)] md:grid">
-                {["Case", "Customer", "Status", "Priority", "Assignee", "Updated", ""].map((label, index) => (
+              <div className={`hidden gap-[var(--space-3)] border-y border-[var(--color-border-divider)] bg-[var(--color-surface-structural-muted)] px-[var(--space-4)] py-[var(--space-3)] md:grid ${CASES_LIST_GRID_COLUMNS}`}>
+                {[
+                  { label: "Case" },
+                  { label: "Customer" },
+                  { label: "Status" },
+                  { label: "Priority", sortColumn: "priority" as const },
+                  { label: "Assignee" },
+                  { label: "Updated", sortColumn: "updated" as const },
+                  { label: "" },
+                ].map((item, index) => (
                   <div
-                    key={`${label}-${index}`}
-                    className={`text-[length:var(--text-meta)] leading-[var(--leading-normal)] font-medium text-[color:var(--color-text-secondary)] ${index === 6 ? "text-right" : ""}`}
+                    key={`${item.label}-${index}`}
+                    className={`min-w-0 text-[length:var(--text-meta)] leading-[var(--leading-normal)] font-medium text-[color:var(--color-text-secondary)] ${index === 6 ? "text-right" : ""}`}
                   >
-                    {label}
+                    {item.sortColumn ? (
+                      <button
+                        type="button"
+                        onClick={() => handleCaseSort(item.sortColumn)}
+                        className={`inline-flex w-full min-w-0 appearance-none items-center justify-between gap-[var(--space-1)] border-0 bg-transparent p-0 text-left transition-colors hover:text-[color:var(--color-text-primary)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-focus-ring)] ${
+                          caseSort.column === item.sortColumn
+                            ? "text-[color:var(--color-text-primary)]"
+                            : ""
+                        }`}
+                        aria-label={`Sort cases by ${item.label}`}
+                      >
+                        <span className="min-w-0 truncate">{item.label}</span>
+                        <SortIndicator
+                          active={caseSort.column === item.sortColumn}
+                          direction={caseSort.direction}
+                        />
+                      </button>
+                    ) : (
+                      item.label
+                    )}
                   </div>
                 ))}
               </div>
 
-              {filteredCases.length > 0 ? (
-                <div className="divide-y divide-[var(--color-border-divider)]">
-                  {filteredCases.map((record) => {
+              {sortedCases.length > 0 ? (
+                <div>
+                  {sortedCases.map((record) => {
                     const priorityDisplay = getPriorityDisplay(record.priority)
                     const statusDisplay = getCaseListStatusDisplay(record.status)
                     const updatedDisplay = formatCaseListUpdated(record.lastUpdate)
@@ -1233,7 +1532,7 @@ export function CaseScreenPage() {
                         key={record.id}
                         type="button"
                         onClick={() => openCase(record.id)}
-                        className="group grid w-full cursor-pointer gap-[var(--space-2)] bg-[var(--color-surface)] px-[var(--space-4)] py-[var(--space-4)] text-left transition-[background-color,border-color,opacity] duration-100 hover:bg-[var(--color-surface-muted)] focus-visible:bg-[var(--color-surface-muted)] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--color-focus-ring)] md:grid-cols-[minmax(0,2.4fr)_minmax(10rem,1.2fr)_minmax(10rem,1fr)_minmax(8rem,0.9fr)_minmax(10rem,1fr)_minmax(9rem,0.9fr)_1.5rem] md:items-center md:gap-[var(--space-3)]"
+                        className={`group grid w-full appearance-none cursor-pointer gap-[var(--space-2)] border-x-0 border-b-0 border-t border-[var(--color-border-divider)] bg-[var(--color-surface)] px-[var(--space-4)] py-[var(--space-4)] text-left transition-[background-color,border-color,opacity] duration-100 first:border-t-0 hover:bg-[var(--color-surface-muted)] focus-visible:bg-[var(--color-surface-muted)] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--color-focus-ring)] md:items-center md:gap-[var(--space-3)] ${CASES_LIST_GRID_COLUMNS}`}
                         aria-label={`Open case ${record.id}`}
                       >
                         <div className="min-w-0 space-y-[var(--space-half)]">
@@ -1269,9 +1568,9 @@ export function CaseScreenPage() {
                           ) : null}
                         </div>
                         <div className="hidden text-right md:block">
-                          <span
-                            aria-hidden="true"
-                            className="inline-block h-[0.5rem] w-[0.5rem] -rotate-45 border-r-2 border-b-2 border-[color:var(--color-text-muted)] transition-colors group-hover:border-[color:var(--color-text-secondary)] group-focus-visible:border-[color:var(--color-text-secondary)]"
+                          <TableChevronIcon
+                            direction="right"
+                            className="text-[color:var(--color-text-muted)] transition-colors group-hover:text-[color:var(--color-text-secondary)] group-focus-visible:text-[color:var(--color-text-secondary)]"
                           />
                         </div>
                       </button>
@@ -1292,7 +1591,7 @@ export function CaseScreenPage() {
                         variant="secondary"
                         size="sm"
                         onClick={() => {
-                          setCaseStatusFilter("all")
+                          setCaseStatusFilter(null)
                           setCaseSearch("")
                         }}
                       >
@@ -1330,9 +1629,9 @@ export function CaseScreenPage() {
       ) : (
         <>
           <RecordShellBar
-            title={draftRecord.title || "Untitled case"}
+            title={draftRecord.title || (isCreatingCase ? "Create case" : "Untitled case")}
             mode="edit"
-            recordId={draftRecord.id}
+            recordId={isCreatingCase ? undefined : draftRecord.id}
             actions={
               <>
                 <div className="text-xs leading-[var(--leading-normal)] font-normal text-[color:var(--color-text-muted)]">
@@ -1341,8 +1640,13 @@ export function CaseScreenPage() {
                 <Button type="button" variant="ghost" onClick={handleCancel}>
                   Cancel
                 </Button>
-                <Button form="case-edit-form" type="submit" variant="primary">
-                  Save
+                <Button
+                  form="case-edit-form"
+                  type="submit"
+                  variant="primary"
+                  disabled={isCreatingCase && !canCreateCase}
+                >
+                  {isCreatingCase ? "Create case" : "Save"}
                 </Button>
               </>
             }
@@ -1362,6 +1666,7 @@ export function CaseScreenPage() {
                       renderMode: "edit",
                       updateField: updateDraft,
                       getDisplayValue,
+                      autoFocusFieldKey: isCreatingCase ? "title" : undefined,
                     })
                   )}
                 </form>

@@ -22,6 +22,7 @@ type RenderCaseRecordSectionArgs = {
   renderMode: SchemaMode
   updateField: UpdateCaseRecordField
   getDisplayValue: (value: string) => string
+  autoFocusFieldKey?: keyof CaseRecord
 }
 
 function renderSectionField(
@@ -30,7 +31,8 @@ function renderSectionField(
   renderMode: SchemaMode,
   sectionTitle: string,
   updateField: UpdateCaseRecordField,
-  getDisplayValue: (value: string) => string
+  getDisplayValue: (value: string) => string,
+  autoFocusFieldKey?: keyof CaseRecord
 ) {
   const fieldValue = record[field.key]
   const fieldSpan = field.span ?? 1
@@ -131,14 +133,15 @@ function renderSectionField(
         required={field.required}
         error={field.error}
       >
-        <Input
-          size="sm"
-          name={field.key}
-          type={field.inputType ?? "text"}
-          value={fieldValue}
-          onChange={(event) => handleFieldChange(event.target.value)}
-          onBlur={field.onBlur}
-        />
+          <Input
+            size="sm"
+            name={field.key}
+            type={field.inputType ?? "text"}
+            value={fieldValue}
+            autoFocus={field.key === autoFocusFieldKey}
+            onChange={(event) => handleFieldChange(event.target.value)}
+            onBlur={field.onBlur}
+          />
       </Field>
     </div>
   )
@@ -150,6 +153,7 @@ export function renderCaseRecordSection({
   renderMode,
   updateField,
   getDisplayValue,
+  autoFocusFieldKey,
 }: RenderCaseRecordSectionArgs) {
   const sectionVisibleInMode =
     !section.visibleIn || section.visibleIn.includes(renderMode)
@@ -178,7 +182,8 @@ export function renderCaseRecordSection({
       renderMode,
       section.title,
       updateField,
-      getDisplayValue
+      getDisplayValue,
+      autoFocusFieldKey
     )
   )
   const isStack = section.layout === "stack"
