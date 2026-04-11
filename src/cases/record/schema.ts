@@ -6,16 +6,16 @@ import type {
   SectionConfig,
 } from "./types"
 
-function shouldShowStatusReason(status: CaseRecord["status"]) {
-  return status === "Waiting on customer" || status === "Escalated" || status === "Resolved"
+function shouldShowStatusReason(record: CaseRecord) {
+  return record.status === "Resolved" || record.statusReason.trim().length > 0
 }
 
-function shouldShowBlockingReason(status: CaseRecord["status"]) {
-  return status === "Waiting on customer"
+function shouldShowBlockingReason(record: CaseRecord) {
+  return record.blockingReason !== "" && record.blockingReason !== "none"
 }
 
-function shouldShowOnHoldUntil(status: CaseRecord["status"]) {
-  return status === "Waiting on customer"
+function shouldShowOnHoldUntil(record: CaseRecord) {
+  return record.onHoldUntil.trim().length > 0
 }
 
 function getChannelReferenceLabel(channel: CaseRecord["channel"]) {
@@ -35,8 +35,6 @@ function getChannelReferenceLabel(channel: CaseRecord["channel"]) {
 export const STATUS_OPTIONS: FieldOption[] = [
   { value: "New", label: "New" },
   { value: "In progress", label: "In progress" },
-  { value: "Waiting on customer", label: "Waiting on customer" },
-  { value: "Escalated", label: "Escalated" },
   { value: "Resolved", label: "Resolved" },
 ]
 
@@ -126,14 +124,14 @@ function getStatusOwnershipSectionConfig(
         label: "Blocking reason",
         type: "select",
         options: BLOCKING_REASON_OPTIONS,
-        when: (currentRecord) => shouldShowBlockingReason(currentRecord.status),
+        when: (currentRecord) => shouldShowBlockingReason(currentRecord),
         span: 2,
       },
       {
         key: "statusReason",
         label: "Status reason",
         type: "text",
-        when: (currentRecord) => shouldShowStatusReason(currentRecord.status),
+        when: (currentRecord) => shouldShowStatusReason(currentRecord),
         span: 2,
         displayBehavior: "flexible",
       },
@@ -141,7 +139,7 @@ function getStatusOwnershipSectionConfig(
         key: "onHoldUntil",
         label: "On hold until",
         type: "text",
-        when: (currentRecord) => shouldShowOnHoldUntil(currentRecord.status),
+        when: (currentRecord) => shouldShowOnHoldUntil(currentRecord),
         inputType: "date",
       },
     ],

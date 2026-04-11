@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react"
+import { useEffect, useState, type ReactNode } from "react"
 import Button from "./Button"
 import StatusBadge, {
   type StatusBadgeEmphasis,
@@ -31,6 +31,13 @@ export type ActivityTimelineItem = {
   secondaryMeta?: ReactNode
 }
 
+export type ActiveSuggestedAction = {
+  label: "Reply to customer" | "Follow up with customer"
+  referenceId: string
+  reason?: string
+  composerOpen: boolean
+}
+
 type ActivityTimelineProps = {
   items: ActivityTimelineItem[]
   ariaLabel?: string
@@ -38,6 +45,12 @@ type ActivityTimelineProps = {
   className?: string
   scrollListOnly?: boolean
   highlightedItemId?: string | null
+  activeSuggestedAction?: ActiveSuggestedAction | null
+  onAppendTimelineItem?: (item: ActivityTimelineItem) => void
+  onCompleteSuggestedAction?: (actionLabel: ActiveSuggestedAction["label"]) => void
+  onSendSuggestedAction?: (actionLabel: ActiveSuggestedAction["label"]) => void
+  onDismissSuggestedAction?: () => void
+  onOpenSuggestedActionComposer?: () => void
 }
 
 const DEFAULT_TYPE_LABELS: Record<ActivityTimelineEventType, string> = {
@@ -272,6 +285,12 @@ export default function ActivityTimeline({
   className = "",
   scrollListOnly = false,
   highlightedItemId = null,
+  activeSuggestedAction = null,
+  onAppendTimelineItem,
+  onCompleteSuggestedAction,
+  onSendSuggestedAction,
+  onDismissSuggestedAction,
+  onOpenSuggestedActionComposer,
 }: ActivityTimelineProps) {
   const [isComposerOpen, setIsComposerOpen] = useState(false)
   const [composerActivityType, setComposerActivityType] =
@@ -279,6 +298,7 @@ export default function ActivityTimeline({
   const [draftNote, setDraftNote] = useState("")
   const [draftItems, setDraftItems] = useState<ActivityTimelineItem[]>([])
   const [expandedItemIds, setExpandedItemIds] = useState<Record<string, boolean>>({})
+  const [replyDraft, setReplyDraft] = useState("")
   const timelineItems = [...items, ...draftItems]
   const visibleAISummaryItemIds = getVisibleAISummaryItemIds(timelineItems)
   const groups = groupActivityTimelineItems(timelineItems)
@@ -472,6 +492,26 @@ export default function ActivityTimeline({
   const itemDeleteClasses = [
     "text-[color:var(--color-text-muted)]",
   ].join(" ")
+  const inlineReplyClasses = [
+    "mt-[var(--space-3)]",
+    "space-y-[var(--space-3)]",
+    "rounded-[var(--radius-sm)]",
+    "border",
+    "border-[var(--color-border-divider)]",
+    "bg-[var(--color-surface)]",
+    "p-[var(--space-3)]",
+  ].join(" ")
+  const inlineReplyTitleClasses = [
+    "text-[length:var(--text-meta)]",
+    "leading-[var(--leading-normal)]",
+    "[font-weight:var(--font-weight-medium)]",
+    "text-[color:var(--color-text-primary)]",
+  ].join(" ")
+  const inlineReplyMetaClasses = [
+    "text-[length:var(--text-xs)]",
+    "leading-[var(--leading-normal)]",
+    "text-[color:var(--color-text-muted)]",
+  ].join(" ")
 
   const emptyStateClasses = [
     "py-[var(--space-4)]",
@@ -485,6 +525,60 @@ export default function ActivityTimeline({
   function handleOpenComposer() {
     setIsComposerOpen(true)
   }
+
+  function buildReplyDraft(item: ActivityTimelineItem, label: ActiveSuggestedAction["label"]) {
+    const customerName = getCustomerFirstName(item)
+
+    if (label === "Follow up with customer") {
+      return `Hi ${customerName}, just following up on this. When you have a moment, could you confirm whether you still need help with this request?`
+    }
+
+    return `Hi ${customerName}, thanks for reaching out. We're reviewing this now. When you have a moment, please let us know if you still need help with this request or if anything has changed since your last message.`
+  }
+
+  function getCustomerFirstName(item: ActivityTimelineItem) {
+    if (typeof item.actor === "string" && item.type === "incoming") {
+      return item.actor.split(" ")[0]
+    }
+
+    const itemIndex = timelineItems.findIndex((timelineItem) => timelineItem.id === item.id)
+
+    if (itemIndex <= 0) {
+      return "there"
+    }
+
+    for (let index = itemIndex - 1; index >= 0; index -= 1) {
+      const candidate = timelineItems[index]
+
+      if (candidate.type === "incoming" && typeof candidate.actor === "string") {
+        return candidate.actor.split(" ")[0]
+      }
+    }
+
+    return "there"
+  }
+
+  useEffect(() => {
+    if (!activeSuggestedAction || !activeSuggestedAction.composerOpen) {
+      setReplyDraft("")
+      return
+    }
+
+    const replyTargetItem = timelineItems.find(
+      (item) => item.id === activeSuggestedAction.referenceId,
+    )
+
+    if (!replyTargetItem) {
+      setReplyDraft("")
+      return
+    }
+
+    setReplyDraft(buildReplyDraft(replyTargetItem, activeSuggestedAction.label))
+  }, [
+    activeSuggestedAction?.composerOpen,
+    activeSuggestedAction?.label,
+    activeSuggestedAction?.referenceId,
+  ])
 
   function handleCancelComposer() {
     setDraftNote("")
@@ -538,6 +632,47 @@ export default function ActivityTimeline({
       delete next[itemId]
       return next
     })
+  }
+
+  function handleDiscardReply() {
+    setReplyDraft("")
+    onDismissSuggestedAction?.()
+  }
+
+  function handleSendReply(item: ActivityTimelineItem) {
+    const trimmedReplyDraft = replyDraft.trim()
+
+    if (!trimmedReplyDraft) {
+      return
+    }
+
+    const createdAt = new Date()
+
+    const nextReplyItem: ActivityTimelineItem = {
+      id: `activity-reply-${createdAt.getTime()}`,
+      timestamp: createdAt.toLocaleString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+      }),
+      timestampDateTime: createdAt.toISOString(),
+      type: "outgoing",
+      actor: "You",
+      subtype: "Support agent",
+      organization: item.organization ?? "VivaLaVita",
+      content: trimmedReplyDraft,
+      aiSummary: buildAISummary(trimmedReplyDraft),
+    }
+
+    onAppendTimelineItem?.(nextReplyItem)
+    if (activeSuggestedAction) {
+      onCompleteSuggestedAction?.(activeSuggestedAction.label)
+      onSendSuggestedAction?.(activeSuggestedAction.label)
+    }
+    setReplyDraft("")
+    onDismissSuggestedAction?.()
   }
 
   return (
@@ -642,6 +777,13 @@ export default function ActivityTimeline({
                       item.type === "comment" &&
                       item.subtype === "Internal note"
                     const hasAISummary = visibleAISummaryItemIds.has(item.id)
+                    const showReplyComposer =
+                      activeSuggestedAction?.referenceId === item.id &&
+                      activeSuggestedAction.composerOpen
+                    const showFollowUpActionBar =
+                      activeSuggestedAction?.label === "Follow up with customer" &&
+                      activeSuggestedAction.referenceId === item.id &&
+                      !activeSuggestedAction.composerOpen
 
                     return (
                       <li
@@ -764,6 +906,82 @@ export default function ActivityTimeline({
                                   Delete
                                 </button>
                               ) : null}
+                            </div>
+                          ) : null}
+                          {showFollowUpActionBar ? (
+                            <div className={inlineReplyClasses}>
+                              <div className="space-y-[var(--space-1)]">
+                                <div className={inlineReplyTitleClasses}>Follow-up suggested</div>
+                                <p className={inlineReplyMetaClasses}>
+                                  {activeSuggestedAction.reason ?? "Waiting for customer confirmation"}
+                                </p>
+                              </div>
+
+                              <div className="flex flex-wrap items-center gap-[var(--space-2)]">
+                                <Button
+                                  type="button"
+                                  variant="secondary"
+                                  size="sm"
+                                  onClick={onOpenSuggestedActionComposer}
+                                >
+                                  Send follow-up
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={onDismissSuggestedAction}
+                                >
+                                  Dismiss
+                                </Button>
+                              </div>
+                            </div>
+                          ) : null}
+                          {showReplyComposer ? (
+                            <div className={inlineReplyClasses}>
+                              <div className="space-y-[var(--space-1)]">
+                                <div className={inlineReplyTitleClasses}>
+                                  {activeSuggestedAction?.label === "Follow up with customer"
+                                    ? "Follow-up draft"
+                                    : "Reply draft"}
+                                </div>
+                                <p className={inlineReplyMetaClasses}>
+                                  {activeSuggestedAction?.label === "Follow up with customer"
+                                    ? activeSuggestedAction.reason ?? "Waiting for customer confirmation"
+                                    : "Review and send from the customer message context."}
+                                </p>
+                              </div>
+
+                              <Textarea
+                                size="sm"
+                                value={replyDraft}
+                                onChange={(event) => setReplyDraft(event.target.value)}
+                                aria-label={
+                                  activeSuggestedAction?.label === "Follow up with customer"
+                                    ? "Follow up with customer"
+                                    : "Reply to customer"
+                                }
+                              />
+
+                              <div className="flex flex-wrap items-center gap-[var(--space-2)]">
+                                <Button
+                                  type="button"
+                                  variant="primary"
+                                  size="sm"
+                                  disabled={!replyDraft.trim()}
+                                  onClick={() => handleSendReply(item)}
+                                >
+                                  Send
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={handleDiscardReply}
+                                >
+                                  Discard
+                                </Button>
+                              </div>
                             </div>
                           ) : null}
                         </div>

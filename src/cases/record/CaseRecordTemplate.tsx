@@ -1,4 +1,4 @@
-import type { ReactNode } from "react"
+import { useEffect, useState, type ReactNode } from "react"
 import { renderCaseRecordSection } from "./renderers"
 import type {
   CaseRecord,
@@ -6,12 +6,22 @@ import type {
   UpdateCaseRecordField,
 } from "./types"
 import type { CaseStatus } from "../../design-system/components/CaseStatusBadge"
-import ActivityTimeline, { type ActivityTimelineItem } from "../../design-system/components/ActivityTimeline"
+import ActivityTimeline, {
+  type ActiveSuggestedAction,
+  type ActivityTimelineItem,
+} from "../../design-system/components/ActivityTimeline"
 import Button from "../../design-system/components/Button"
 import Drawer from "../../design-system/components/Drawer"
 import Link from "../../design-system/components/Link"
 import Tabs from "../../design-system/components/Tabs"
 import RecordPageTemplate from "../../design-system/templates/RecordPageTemplate"
+
+export type CaseState =
+  | "Needs assignment"
+  | "Waiting for first response"
+  | "Waiting for customer response"
+  | "Waiting for internal review"
+  | "In investigation"
 
 type AIRecordInsight = {
   signals: string[]
@@ -19,6 +29,7 @@ type AIRecordInsight = {
   actions: {
     label: string
     referenceId?: string
+    reason?: string
   }[]
   references: {
     id: string
@@ -37,15 +48,21 @@ type CaseRecordTemplateProps = {
   onBackToCases: () => void
   onEnterEditMode: () => void
   selectedActivityTimelineItems: ActivityTimelineItem[]
+  caseState: CaseState
   highlightedTimelineItemId: string | null
+  activeSuggestedAction: ActiveSuggestedAction | null
+  onAppendTimelineItem: (item: ActivityTimelineItem) => void
+  onDismissSuggestedAction: () => void
+  onOpenSuggestedActionComposer: () => void
   isAIDrawerOpen: boolean
   onToggleAIDrawer: () => void
   onCloseAIDrawer: () => void
   aiUpdatedLabel: ReactNode
   aiRecordInsight: AIRecordInsight
   onRefreshAIInsights: () => void
+  onSendSuggestedAction: (actionLabel: ActiveSuggestedAction["label"]) => void
   onAIReferenceClick: (referenceId: string) => void
-  onAIActionClick: (referenceId: string) => void
+  onAIActionClick: (actionLabel: string, referenceId: string, reason?: string) => void
 }
 
 const recordTabs = [
@@ -72,16 +89,37 @@ export default function CaseRecordTemplate({
   onBackToCases,
   onEnterEditMode,
   selectedActivityTimelineItems,
+  caseState,
   highlightedTimelineItemId,
+  activeSuggestedAction,
+  onAppendTimelineItem,
+  onDismissSuggestedAction,
+  onOpenSuggestedActionComposer,
   isAIDrawerOpen,
   onToggleAIDrawer,
   onCloseAIDrawer,
   aiUpdatedLabel,
   aiRecordInsight,
   onRefreshAIInsights,
+  onSendSuggestedAction,
   onAIReferenceClick,
   onAIActionClick,
 }: CaseRecordTemplateProps) {
+  const [completedSuggestedActionLabels, setCompletedSuggestedActionLabels] = useState<string[]>([])
+  const visibleSuggestedActions = aiRecordInsight.actions.filter(
+    (action) => !completedSuggestedActionLabels.includes(action.label),
+  )
+  const headerMetadataItems = [
+    record.customer.trim(),
+    record.assignee.trim(),
+    record.priority.trim() ? `${record.priority} priority` : "",
+    record.queue.trim(),
+  ].filter(Boolean)
+
+  useEffect(() => {
+    setCompletedSuggestedActionLabels([])
+  }, [record.id])
+
   return (
     <RecordPageTemplate
       breadcrumbs={[
@@ -99,13 +137,7 @@ export default function CaseRecordTemplate({
       ]}
       title={record.title}
       status={status}
-      metadata={
-        <>
-          {record.customer}
-          {" • "}
-          {record.assignee}
-        </>
-      }
+      metadata={headerMetadataItems.join(" • ")}
       actions={
         <Button variant="secondary" onClick={onEnterEditMode}>
           Edit
@@ -139,6 +171,16 @@ export default function CaseRecordTemplate({
                   items={selectedActivityTimelineItems}
                   className="h-full"
                   highlightedItemId={highlightedTimelineItemId}
+                  activeSuggestedAction={activeSuggestedAction}
+                  onAppendTimelineItem={onAppendTimelineItem}
+                  onCompleteSuggestedAction={(actionLabel) =>
+                    setCompletedSuggestedActionLabels((current) =>
+                      current.includes(actionLabel) ? current : [...current, actionLabel],
+                    )
+                  }
+                  onSendSuggestedAction={onSendSuggestedAction}
+                  onDismissSuggestedAction={onDismissSuggestedAction}
+                  onOpenSuggestedActionComposer={onOpenSuggestedActionComposer}
                   scrollListOnly
                 />
               )}
@@ -176,6 +218,15 @@ export default function CaseRecordTemplate({
             </h3>
             <div className="pt-[var(--space-1)]">
               <div className="grid gap-x-[var(--space-3)] gap-y-[var(--space-3)] sm:grid-cols-2">
+                <div className="min-w-0">
+                  <span className="text-[length:var(--text-meta)] leading-[var(--leading-normal)] text-[color:var(--color-text-muted)]">
+                    State:
+                  </span>
+                  {" "}
+                  <span className="text-[length:var(--text-meta)] leading-[var(--leading-normal)] text-[color:var(--color-text-primary)]">
+                    {caseState}
+                  </span>
+                </div>
                 {aiRecordInsight.signals.map((signal) => {
                   const [label, value = ""] = signal.split(": ")
 
@@ -250,7 +301,7 @@ export default function CaseRecordTemplate({
               Suggested next steps. Review before action.
             </p>
             <ol className="list-outside list-decimal space-y-[var(--space-2)] pt-[var(--space-1)] pl-[var(--space-4)] marker:text-[color:var(--color-text-secondary)]">
-              {aiRecordInsight.actions.map((action) => (
+              {visibleSuggestedActions.map((action) => (
                 <li
                   key={action.label}
                   className="text-sm leading-normal text-[color:var(--color-text-primary)]"
@@ -261,7 +312,9 @@ export default function CaseRecordTemplate({
                   ) ? (
                     <button
                       type="button"
-                      onClick={() => onAIActionClick(action.referenceId!)}
+                      onClick={() =>
+                        onAIActionClick(action.label, action.referenceId!, action.reason)
+                      }
                       className="cursor-pointer text-left text-[color:inherit] underline-offset-2 transition-colors hover:text-[color:var(--color-text-primary)] hover:underline focus-visible:rounded-[var(--radius-sm)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-focus-ring)]"
                     >
                       {action.label}
@@ -269,6 +322,11 @@ export default function CaseRecordTemplate({
                   ) : (
                     action.label
                   )}
+                  {action.reason ? (
+                    <div className="pt-[var(--space-half)] text-[length:var(--text-xs)] leading-[var(--leading-normal)] text-[color:var(--color-text-muted)]">
+                      {action.reason}
+                    </div>
+                  ) : null}
                 </li>
               ))}
             </ol>

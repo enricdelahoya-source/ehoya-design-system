@@ -1,12 +1,17 @@
 import { useEffect, useState } from "react"
 import CasesListTemplate from "../cases/list/CasesListTemplate"
-import CaseRecordTemplate from "../cases/record/CaseRecordTemplate"
+import CaseRecordTemplate, {
+  type CaseState,
+} from "../cases/record/CaseRecordTemplate"
 import { renderCaseRecordSection } from "../cases/record/renderers"
 import { getCaseRecordSections, STATUS_OPTIONS } from "../cases/record/schema"
 import type { CaseRecord, SectionConfig } from "../cases/record/types"
 import Button from "../design-system/components/Button"
 import CaseStatusBadge, { type CaseStatus } from "../design-system/components/CaseStatusBadge"
-import ActivityTimeline, { type ActivityTimelineItem } from "../design-system/components/ActivityTimeline"
+import ActivityTimeline, {
+  type ActiveSuggestedAction,
+  type ActivityTimelineItem,
+} from "../design-system/components/ActivityTimeline"
 import Input from "../design-system/components/controls/Input"
 import ReadOnlyValue from "../design-system/components/controls/ReadOnlyValue"
 import Field from "../design-system/components/fields/Field"
@@ -49,6 +54,7 @@ type AIRecordInsight = {
   actions: {
     label: string
     referenceId?: string
+    reason?: string
   }[]
   references: {
     id: string
@@ -59,6 +65,7 @@ type AIRecordInsight = {
 type AICaseSignals = {
   status: AICaseInput["status"]
   priority?: AICaseInput["priority"]
+  assignee?: string
   blockingReason: CaseRecord["blockingReason"]
   isEscalated: boolean
   isWaitingOnCustomer: boolean
@@ -73,6 +80,50 @@ type AIEvidenceSignal = {
   intent: "blocked" | "progress" | "resolved"
   blockingReason: CaseRecord["blockingReason"]
   selectedEvent?: ActivityTimelineItem
+}
+
+function isCustomerResponseRequest(item: ActivityTimelineItem) {
+  if (item.type !== "outgoing" || typeof item.content !== "string") {
+    return false
+  }
+
+  const normalizedContent = item.content.toLowerCase()
+
+  return [
+    "confirm",
+    "let us know",
+    "could you",
+    "when you have a moment",
+    "validation",
+    "still need help",
+    "reply",
+    "approved",
+    "which entity",
+  ].some((phrase) => normalizedContent.includes(phrase))
+}
+
+function indicatesInternalReview(item: ActivityTimelineItem) {
+  if (typeof item.content !== "string") {
+    return false
+  }
+
+  const normalizedContent = item.content.toLowerCase()
+
+  return (
+    item.type === "comment" ||
+    item.type === "internal" ||
+    item.type === "internal-note" ||
+    item.type === "system" ||
+    item.type === "status-change"
+  ) && [
+    "engineering",
+    "approval",
+    "review",
+    "dependency",
+    "escalat",
+    "pending",
+    "validation",
+  ].some((phrase) => normalizedContent.includes(phrase))
 }
 
 function getSuggestedTargets(severity: CaseRecord["severity"]) {
@@ -143,25 +194,10 @@ function buildAICaseInput(record: CaseRecord, sections: SectionConfig[]): AICase
   }
 }
 
-function getBlockingReasonSummary(reason: CaseRecord["blockingReason"]) {
-  switch (reason) {
-    case "awaiting_customer_reply":
-      return "The case is currently blocked on a customer reply."
-    case "awaiting_customer_validation":
-      return "The case is waiting for the customer to validate the current remediation."
-    case "awaiting_approval":
-      return "The case is paused pending approval before the next operational step."
-    case "awaiting_engineering_fix":
-      return "The case is blocked on an engineering-side fix before progress can resume."
-    default:
-      return null
-  }
-}
-
 function getBlockingReasonAction(reason: CaseRecord["blockingReason"]) {
   switch (reason) {
     case "awaiting_customer_reply":
-      return "Request customer reply"
+      return null
     case "awaiting_customer_validation":
       return "Ask for customer validation"
     case "awaiting_approval":
@@ -187,6 +223,9 @@ function detectAICaseSignals(input: AICaseInput): AICaseSignals {
   const approvalRequiredValue = fieldEntries.find(
     (field) => field.label === "Approval required"
   )?.value
+  const assigneeValue = fieldEntries.find(
+    (field) => field.label === "Assignee"
+  )?.value
 
   const hasKeyword = (keywords: string[]) =>
     keywords.some((keyword) => combinedCaseText.includes(keyword))
@@ -194,6 +233,7 @@ function detectAICaseSignals(input: AICaseInput): AICaseSignals {
   return {
     status: input.status,
     priority: input.priority,
+    assignee: assigneeValue ?? undefined,
     blockingReason: input.blockingReason ?? "",
     isEscalated: input.status === "Escalated",
     isWaitingOnCustomer: input.status === "Waiting on customer",
@@ -207,39 +247,17 @@ function detectAICaseSignals(input: AICaseInput): AICaseSignals {
 }
 
 function buildFakeSignalItems(signals: AICaseSignals): string[] {
-  const items = [`Status: ${signals.status}`]
+  const items: string[] = []
 
   if (signals.priority) {
     items.push(`Priority: ${signals.priority}`)
   }
 
-  if (signals.blockingReason === "awaiting_customer_reply") {
-    items.push("Blocker: awaiting customer reply")
-  } else if (signals.blockingReason === "awaiting_customer_validation") {
-    items.push("Blocker: awaiting customer validation")
-  } else if (signals.blockingReason === "awaiting_approval") {
-    items.push("Blocker: awaiting approval")
-  } else if (signals.blockingReason === "awaiting_engineering_fix") {
-    items.push("Blocker: awaiting engineering fix")
+  if (signals.assignee) {
+    items.push(`Assignee: ${signals.assignee}`)
   }
 
-  if (signals.isEscalated) {
-    items.push("Escalation: active")
-  }
-
-  if (signals.needsApproval) {
-    items.push("Approval: required")
-  }
-
-  if (signals.isMigrationRelated) {
-    items.push("Pattern: migration-related")
-  } else if (signals.isVisibilityIssue) {
-    items.push("Pattern: visibility-related")
-  } else if (signals.isAuthRelated) {
-    items.push("Pattern: access-related")
-  }
-
-  return items.slice(0, 5)
+  return items.slice(0, 2)
 }
 
 function getCaseIntent(signals: AICaseSignals): AIEvidenceSignal["intent"] {
@@ -280,17 +298,71 @@ function buildEventEvidenceLine(item?: ActivityTimelineItem) {
   }
 }
 
-function buildFakeSummary(evidenceSignal: AIEvidenceSignal): string[] {
-  const summary: string[] = []
-  const blockingReasonSummary = getBlockingReasonSummary(evidenceSignal.blockingReason)
-  const eventEvidenceLine = buildEventEvidenceLine(evidenceSignal.selectedEvent)
+function isFollowUpMessage(item?: ActivityTimelineItem) {
+  if (!item || typeof item.content !== "string") {
+    return false
+  }
 
-  if (evidenceSignal.intent === "blocked") {
-    summary.push(blockingReasonSummary ?? "The case is currently blocked on a recorded constraint.")
-  } else if (evidenceSignal.intent === "resolved") {
-    summary.push("The case is resolved, and the selected activity records the closure path.")
+  const normalizedContent = item.content.toLowerCase()
+
+  return (
+    normalizedContent.includes("following up") ||
+    normalizedContent.includes("checking in")
+  )
+}
+
+function buildFakeSummary(
+  evidenceSignal: AIEvidenceSignal,
+  caseState: CaseState,
+  timelineItems: ActivityTimelineItem[],
+): string[] {
+  const summary: string[] = []
+  const eventEvidenceLine = buildEventEvidenceLine(evidenceSignal.selectedEvent)
+  const latestCustomerMessage = [...timelineItems]
+    .reverse()
+    .find((item) => item.type === "incoming")
+  const latestOutboundAwaitingCustomerResponse =
+    findLatestOutboundAwaitingCustomerResponse(
+      timelineItems,
+      latestCustomerMessage,
+    )
+
+  if (caseState === "Waiting for customer response") {
+    const customerMessage =
+      typeof latestCustomerMessage?.content === "string"
+        ? latestCustomerMessage.content.toLowerCase()
+        : ""
+
+    if (
+      customerMessage.includes("branding") ||
+      customerMessage.includes("statement")
+    ) {
+      summary.push(
+        "Customer still needs to confirm whether the corrected branding is right across the updated statements.",
+      )
+    } else {
+      summary.push(
+        "Customer still needs to confirm the latest requested details before the case can move forward.",
+      )
+    }
+
+    summary.push(
+      isFollowUpMessage(latestOutboundAwaitingCustomerResponse)
+        ? "Support requested confirmation and sent a follow-up. The case is waiting for customer response."
+        : "Support requested confirmation and is waiting for customer response.",
+    )
+
+    return summary.slice(0, 2)
+  }
+
+  if (evidenceSignal.intent === "resolved") {
+    summary.push("The latest record documents the resolution path and the customer-facing closure context.")
+  } else if (evidenceSignal.selectedEvent?.type === "incoming") {
+    summary.push("The latest customer message captures the open request that support is working from.")
+  } else if (evidenceSignal.selectedEvent?.type === "outgoing") {
+    summary.push("The latest customer-facing update shows what support has already communicated.")
   } else {
-    summary.push("The case is in active progress, and the selected activity shows the current workstream.")
+    summary.push("Recent internal activity captures the current working context for the case.")
   }
 
   if (eventEvidenceLine) {
@@ -310,14 +382,75 @@ function getTimelineItemTimeValue(item?: ActivityTimelineItem) {
   return Number.isNaN(timeValue) ? Number.NEGATIVE_INFINITY : timeValue
 }
 
+function hasUnansweredCustomerMessage(
+  latestCustomerMessage?: ActivityTimelineItem,
+  latestAgentMessage?: ActivityTimelineItem,
+) {
+  return getTimelineItemTimeValue(latestCustomerMessage) >
+    getTimelineItemTimeValue(latestAgentMessage)
+}
+
+function findLatestOutboundAwaitingCustomerResponse(
+  timelineItems: ActivityTimelineItem[],
+  latestCustomerMessage?: ActivityTimelineItem,
+) {
+  const latestCustomerTime = getTimelineItemTimeValue(latestCustomerMessage)
+
+  return [...timelineItems]
+    .reverse()
+    .find(
+      (item) =>
+        item.type === "outgoing" &&
+        getTimelineItemTimeValue(item) > latestCustomerTime &&
+        isCustomerResponseRequest(item),
+    )
+}
+
+function deriveCaseState(
+  record: CaseRecord,
+  timelineItems: ActivityTimelineItem[],
+): CaseState {
+  if (!record.assignee.trim()) {
+    return "Needs assignment"
+  }
+
+  const latestCustomerMessage = [...timelineItems]
+    .reverse()
+    .find((item) => item.type === "incoming")
+  const latestAgentMessage = [...timelineItems]
+    .reverse()
+    .find((item) => item.type === "outgoing")
+  const latestOutboundAwaitingCustomerResponse =
+    findLatestOutboundAwaitingCustomerResponse(
+      timelineItems,
+      latestCustomerMessage,
+    )
+
+  if (hasUnansweredCustomerMessage(latestCustomerMessage, latestAgentMessage)) {
+    return "Waiting for first response"
+  }
+
+  if (latestOutboundAwaitingCustomerResponse) {
+    return "Waiting for customer response"
+  }
+
+  if (record.status !== "Resolved" && timelineItems.some(indicatesInternalReview)) {
+    return "Waiting for internal review"
+  }
+
+  return "In investigation"
+}
+
 function buildFakeActions(
   evidenceSignal: AIEvidenceSignal,
+  caseState: CaseState,
   timelineItems: ActivityTimelineItem[],
 ): {
   label: string
   referenceId?: string
+  reason?: string
 }[] {
-  const actions: { label: string; referenceId?: string }[] = []
+  const actions: { label: string; referenceId?: string; reason?: string }[] = []
   const selectedEvent = evidenceSignal.selectedEvent
   const actionReferenceId = selectedEvent?.id
   const selectedEventContent =
@@ -331,25 +464,54 @@ function buildFakeActions(
   const latestAgentMessage = [...timelineItems]
     .reverse()
     .find((item) => item.type === "outgoing")
-  const customerIsLastSpeaker =
-    getTimelineItemTimeValue(latestCustomerMessage) >
-    getTimelineItemTimeValue(latestAgentMessage)
-  const pushAction = (label: string, referenceId = actionReferenceId) => {
+  const latestOutboundAwaitingCustomerResponse =
+    findLatestOutboundAwaitingCustomerResponse(
+      timelineItems,
+      latestCustomerMessage,
+    )
+  const customerIsLastSpeaker = hasUnansweredCustomerMessage(
+    latestCustomerMessage,
+    latestAgentMessage,
+  )
+  const pushAction = (
+    label: string,
+    referenceId = actionReferenceId,
+    reason?: string,
+  ) => {
     if (actions.some((action) => action.label === label)) {
       return
     }
 
-    actions.push({ label, referenceId })
+    actions.push({ label, referenceId, reason })
   }
 
   if (evidenceSignal.intent === "blocked") {
+    if (caseState === "Waiting for customer response") {
+      const hasRecentFollowUp = isFollowUpMessage(
+        latestOutboundAwaitingCustomerResponse,
+      )
+
+      if (latestOutboundAwaitingCustomerResponse && !hasRecentFollowUp) {
+        pushAction(
+          "Follow up with customer",
+          latestOutboundAwaitingCustomerResponse.id,
+          "Waiting for customer confirmation",
+        )
+      }
+
+      if (latestCustomerMessage) {
+        pushAction("Review customer message", latestCustomerMessage.id)
+      }
+
+      return actions.slice(0, 2)
+    }
+
     if (blockingReasonAction) {
       pushAction(blockingReasonAction)
     }
 
     switch (evidenceSignal.blockingReason) {
       case "awaiting_customer_reply":
-        pushAction("Send customer follow-up")
         break
       case "awaiting_customer_validation":
         pushAction("Confirm validation steps")
@@ -371,7 +533,7 @@ function buildFakeActions(
       case "comment":
       case "internal":
       case "internal-note":
-        pushAction("Follow up on internal note")
+        pushAction("Review case context")
         break
       case "status-change":
       case "system":
@@ -397,11 +559,14 @@ function buildFakeActions(
 
     return actions.slice(0, 2)
   }
-
   switch (selectedEvent?.type) {
     case "incoming":
-      if (customerIsLastSpeaker && latestCustomerMessage) {
-        pushAction("Respond to customer", latestCustomerMessage.id)
+      if (
+        caseState === "Waiting for first response" &&
+        customerIsLastSpeaker &&
+        latestCustomerMessage
+      ) {
+        pushAction("Reply to customer", latestCustomerMessage.id)
       } else {
         pushAction("Wait for customer response", latestAgentMessage?.id)
       }
@@ -454,6 +619,7 @@ function buildTimelineReferenceLabel(item: ActivityTimelineItem) {
 
 function selectReferenceItems(
   signals: AICaseSignals,
+  caseState: CaseState,
   timelineItems: ActivityTimelineItem[],
 ): ActivityTimelineItem[] {
   const references: ActivityTimelineItem[] = []
@@ -480,6 +646,9 @@ function selectReferenceItems(
 
   const findLatestCustomerMessage = () =>
     findLatestTimelineItem((item) => item.type === "incoming")
+
+  const findLatestOutboundCustomerRequest = () =>
+    findLatestTimelineItem((item) => item.type === "outgoing" && isCustomerResponseRequest(item))
 
   const findLatestInternalNote = () =>
     findLatestTimelineItem((item, normalizedContent) =>
@@ -519,7 +688,10 @@ function selectReferenceItems(
       )
     )
 
-  if (caseIntent === "blocked") {
+  if (caseState === "Waiting for customer response") {
+    addReference(findLatestOutboundCustomerRequest())
+    addReference(findLatestCustomerMessage())
+  } else if (caseIntent === "blocked") {
     if (signals.isWaitingOnCustomer) {
       addReference(findLatestCustomerMessage())
     }
@@ -606,10 +778,11 @@ function isElementVisibleInScrollRegion(element: HTMLElement) {
 function getFakeAIRecordInsight(
   input: AICaseInput,
   _aiVersion: number,
+  caseState: CaseState,
   timelineItems: ActivityTimelineItem[],
 ): AIRecordInsight {
   const signals = detectAICaseSignals(input)
-  const referenceItems = selectReferenceItems(signals, timelineItems)
+  const referenceItems = selectReferenceItems(signals, caseState, timelineItems)
   const evidenceSignal: AIEvidenceSignal = {
     intent: getCaseIntent(signals),
     blockingReason: signals.blockingReason,
@@ -618,8 +791,8 @@ function getFakeAIRecordInsight(
 
   return {
     signals: buildFakeSignalItems(signals),
-    summary: buildFakeSummary(evidenceSignal),
-    actions: buildFakeActions(evidenceSignal, timelineItems),
+    summary: buildFakeSummary(evidenceSignal, caseState, timelineItems),
+    actions: buildFakeActions(evidenceSignal, caseState, timelineItems),
     references: buildFakeReferences(referenceItems),
   }
 }
@@ -1010,6 +1183,28 @@ function buildNewCaseRecord(): CaseRecord {
   }
 }
 
+function removeRedundantStatusOwnershipFields(
+  sections: SectionConfig[],
+  record: CaseRecord,
+) {
+  if (record.id !== INITIAL_CASE_RECORD.id) {
+    return sections
+  }
+
+  return sections.map((section) => {
+    if (section.id !== "status-ownership") {
+      return section
+    }
+
+    return {
+      ...section,
+      fields: section.fields.filter(
+        (field) => field.key !== "blockingReason" && field.key !== "statusReason",
+      ),
+    }
+  })
+}
+
 export function CaseScreenPage() {
   const [recordTab, setRecordTab] = useState<"details" | "activity">("details")
   const [screenView, setScreenView] = useState<"list" | "record">("list")
@@ -1032,6 +1227,12 @@ export function CaseScreenPage() {
   const [aiUpdatedAt, setAiUpdatedAt] = useState(() => Date.now())
   const [pendingTimelineReferenceId, setPendingTimelineReferenceId] = useState<string | null>(null)
   const [highlightedTimelineItemId, setHighlightedTimelineItemId] = useState<string | null>(null)
+  const [activeSuggestedAction, setActiveSuggestedAction] =
+    useState<ActiveSuggestedAction | null>(null)
+  const [appendedTimelineItemsByCaseId, setAppendedTimelineItemsByCaseId] = useState<
+    Record<string, ActivityTimelineItem[]>
+  >({})
+  const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [responseTargetEdited, setResponseTargetEdited] = useState(false)
   const [resolutionTargetEdited, setResolutionTargetEdited] = useState(false)
   const [touched, setTouched] = useState({
@@ -1064,8 +1265,11 @@ export function CaseScreenPage() {
   const visiblePriorityError =
     touched.priority || saveAttempted ? priorityError : undefined
 
-  const viewRecordSections = getCaseRecordSections(savedRecord)
-  const baseEditRecordSections = getCaseRecordSections(draftRecord, {
+  const viewRecordSections = removeRedundantStatusOwnershipFields(
+    getCaseRecordSections(savedRecord),
+    savedRecord,
+  )
+  const baseEditRecordSections = removeRedundantStatusOwnershipFields(getCaseRecordSections(draftRecord, {
     visibleTitleError,
     visiblePriorityError,
     markTitleTouched: () => markTouched("title"),
@@ -1076,7 +1280,7 @@ export function CaseScreenPage() {
     onFieldChange: updateDraft,
     onResponseTargetEdit: () => setResponseTargetEdited(true),
     onResolutionTargetEdit: () => setResolutionTargetEdited(true),
-  })
+  }), draftRecord)
   const editRecordSections = baseEditRecordSections.map((section) => ({
     ...section,
     fields: section.fields.map((field) => {
@@ -1104,12 +1308,18 @@ export function CaseScreenPage() {
   const aiSourceSections = viewRecordSections.filter((section) =>
     section.id === "status-ownership" || section.id === "classification"
   )
-  const selectedActivityTimelineItems =
+  const baseSelectedActivityTimelineItems =
     activityTimelineItemsByCaseId[selectedCaseId] ?? activityTimelineItems
+  const selectedActivityTimelineItems = [
+    ...baseSelectedActivityTimelineItems,
+    ...(appendedTimelineItemsByCaseId[selectedCaseId] ?? []),
+  ]
+  const caseState = deriveCaseState(savedRecord, selectedActivityTimelineItems)
   const aiCaseInput = buildAICaseInput(savedRecord, aiSourceSections)
   const aiRecordInsight = getFakeAIRecordInsight(
     aiCaseInput,
     aiVersion,
+    caseState,
     selectedActivityTimelineItems
   )
   const aiUpdatedLabel = formatAIUpdatedLabel(aiUpdatedAt)
@@ -1190,6 +1400,18 @@ export function CaseScreenPage() {
     return () => window.clearTimeout(timeoutId)
   }, [highlightedTimelineItemId])
 
+  useEffect(() => {
+    if (!toastMessage) {
+      return
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setToastMessage(null)
+    }, 2400)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [toastMessage])
+
   function resetEditState(nextDraft: CaseRecord) {
     setDraftRecord(nextDraft)
     setResponseTargetEdited(false)
@@ -1210,17 +1432,31 @@ export function CaseScreenPage() {
   function handleAIReferenceClick(referenceId: string) {
     setRecordTab("activity")
     setPendingTimelineReferenceId(referenceId)
+    setActiveSuggestedAction(null)
   }
 
-  function handleAIActionClick(referenceId: string) {
+  function handleAIActionClick(actionLabel: string, referenceId: string, reason?: string) {
     setRecordTab("activity")
     setPendingTimelineReferenceId(referenceId)
+
+    if (actionLabel === "Reply to customer" || actionLabel === "Follow up with customer") {
+      setActiveSuggestedAction({
+        label: actionLabel,
+        referenceId,
+        reason,
+        composerOpen: actionLabel === "Reply to customer",
+      })
+      return
+    }
+
+    setActiveSuggestedAction(null)
   }
 
   function enterEditMode() {
     resetEditState(savedRecord)
     setRecordTab("details")
     setIsAIDrawerOpen(false)
+    setActiveSuggestedAction(null)
     setCreateCaseBaseline(null)
     setMode("edit")
   }
@@ -1236,6 +1472,7 @@ export function CaseScreenPage() {
     resetEditState(nextCase)
     setRecordTab("details")
     setIsAIDrawerOpen(true)
+    setActiveSuggestedAction(null)
     setCreateCaseBaseline(null)
     setMode("view")
     setScreenView("record")
@@ -1250,6 +1487,7 @@ export function CaseScreenPage() {
     resetEditState(nextCase)
     setRecordTab("details")
     setIsAIDrawerOpen(false)
+    setActiveSuggestedAction(null)
     setMode("edit")
     setScreenView("record")
   }
@@ -1319,7 +1557,19 @@ export function CaseScreenPage() {
     }
 
     setCreateCaseBaseline(null)
+    setActiveSuggestedAction(null)
     setScreenView("list")
+  }
+
+  function handleAppendTimelineItem(item: ActivityTimelineItem) {
+    if (!selectedCaseId) {
+      return
+    }
+
+    setAppendedTimelineItemsByCaseId((current) => ({
+      ...current,
+      [selectedCaseId]: [...(current[selectedCaseId] ?? []), item],
+    }))
   }
 
   function handleCancel() {
@@ -1616,13 +1866,35 @@ export function CaseScreenPage() {
           onBackToCases={handleBackToCases}
           onEnterEditMode={enterEditMode}
           selectedActivityTimelineItems={selectedActivityTimelineItems}
+          caseState={caseState}
           highlightedTimelineItemId={highlightedTimelineItemId}
+          activeSuggestedAction={activeSuggestedAction}
+          onAppendTimelineItem={handleAppendTimelineItem}
+          onDismissSuggestedAction={() => setActiveSuggestedAction(null)}
+          onOpenSuggestedActionComposer={() =>
+            setActiveSuggestedAction((current) =>
+              current
+                ? {
+                    ...current,
+                    composerOpen: true,
+                  }
+                : current,
+            )
+          }
           isAIDrawerOpen={isAIDrawerOpen}
           onToggleAIDrawer={() => setIsAIDrawerOpen((current) => !current)}
           onCloseAIDrawer={() => setIsAIDrawerOpen(false)}
           aiUpdatedLabel={aiUpdatedLabel}
           aiRecordInsight={aiRecordInsight}
           onRefreshAIInsights={refreshAIInsights}
+          onSendSuggestedAction={(actionLabel) => {
+            if (actionLabel === "Reply to customer") {
+              setToastMessage("Reply sent to customer")
+              return
+            }
+
+            setToastMessage("Follow-up sent to customer")
+          }}
           onAIReferenceClick={handleAIReferenceClick}
           onAIActionClick={handleAIActionClick}
         />
@@ -1675,6 +1947,13 @@ export function CaseScreenPage() {
           </div>
         </>
       )}
+      {toastMessage ? (
+        <div className="fixed right-[var(--space-6)] bottom-[var(--space-6)] z-50">
+          <div className="rounded-[var(--radius-sm)] border border-[var(--color-border-success)] bg-[var(--color-surface-elevated)] px-[var(--space-4)] py-[var(--space-3)] text-[length:var(--text-sm)] leading-[var(--leading-normal)] text-[color:var(--color-text-primary)]">
+            {toastMessage}
+          </div>
+        </div>
+      ) : null}
     </main>
   )
 }
