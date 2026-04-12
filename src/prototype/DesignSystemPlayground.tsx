@@ -1,11 +1,9 @@
 import { useEffect, useState } from "react"
 import CasesListTemplate from "../cases/list/CasesListTemplate"
-import CaseRecordTemplate, {
-  type CaseState,
-} from "../cases/record/CaseRecordTemplate"
+import CaseRecordTemplate from "../cases/record/CaseRecordTemplate"
 import { renderCaseRecordSection } from "../cases/record/renderers"
 import { getCaseRecordSections, STATUS_OPTIONS } from "../cases/record/schema"
-import type { CaseRecord, SectionConfig } from "../cases/record/types"
+import type { CaseRecord, CaseState, SectionConfig } from "../cases/record/types"
 import Button from "../design-system/components/Button"
 import CaseStatusBadge, { type CaseStatus } from "../design-system/components/CaseStatusBadge"
 import ActivityTimeline, {
@@ -23,7 +21,10 @@ import PageContent from "../design-system/components/PageContent"
 import FormSection from "../design-system/components/sections/FormSection"
 import RecordSection from "../design-system/components/sections/RecordSection"
 import RecordShellBar from "../design-system/components/RecordShellBar"
-import StatusBadge from "../design-system/components/StatusBadge"
+import StatusBadge, {
+  type StatusBadgeEmphasis,
+  type StatusBadgeTone,
+} from "../design-system/components/StatusBadge"
 import SummaryCard from "../design-system/components/SummaryCard"
 import Tabs from "../design-system/components/Tabs"
 import {
@@ -36,7 +37,8 @@ import {
 type AICaseInput = {
   caseId: string
   title: string
-  status: string
+  status: CaseRecord["status"]
+  state: CaseState
   priority?: string
   blockingReason?: CaseRecord["blockingReason"]
   sections: {
@@ -49,31 +51,31 @@ type AICaseInput = {
 }
 
 type AIRecordInsight = {
+  situation: {
+    badge: {
+      label: string
+      tone: StatusBadgeTone
+      emphasis: StatusBadgeEmphasis
+    }
+    ownership: string
+    condition?: string
+  }[]
+  caseSummary: string[]
   signals: string[]
-  summary: string[]
   actions: {
     label: string
     referenceId?: string
     reason?: string
   }[]
-  references: {
-    id: string
-    label: string
-  }[]
+  basedOn: string[]
 }
 
 type AICaseSignals = {
-  status: AICaseInput["status"]
-  priority?: AICaseInput["priority"]
-  assignee?: string
-  blockingReason: CaseRecord["blockingReason"]
-  isEscalated: boolean
-  isWaitingOnCustomer: boolean
-  isHighPriority: boolean
-  needsApproval: boolean
-  isMigrationRelated: boolean
-  isVisibilityIssue: boolean
-  isAuthRelated: boolean
+  breachRisk: string
+  hasExternalDependency: boolean
+  hasMultiEntityImpact: boolean
+  hasRevenueImpact: boolean
+  isReopened: boolean
 }
 
 type AIEvidenceSignal = {
@@ -102,30 +104,6 @@ function isCustomerResponseRequest(item: ActivityTimelineItem) {
   ].some((phrase) => normalizedContent.includes(phrase))
 }
 
-function indicatesInternalReview(item: ActivityTimelineItem) {
-  if (typeof item.content !== "string") {
-    return false
-  }
-
-  const normalizedContent = item.content.toLowerCase()
-
-  return (
-    item.type === "comment" ||
-    item.type === "internal" ||
-    item.type === "internal-note" ||
-    item.type === "system" ||
-    item.type === "status-change"
-  ) && [
-    "engineering",
-    "approval",
-    "review",
-    "dependency",
-    "escalat",
-    "pending",
-    "validation",
-  ].some((phrase) => normalizedContent.includes(phrase))
-}
-
 function getSuggestedTargets(severity: CaseRecord["severity"]) {
   switch (severity) {
     case "Critical":
@@ -151,10 +129,6 @@ function getShellStatus(status: CaseRecord["status"]): CaseStatus {
   switch (status) {
     case "New":
       return "new"
-    case "Waiting on customer":
-      return "waiting_on_customer"
-    case "Escalated":
-      return "escalated"
     case "Resolved":
       return "resolved"
     case "In progress":
@@ -163,7 +137,11 @@ function getShellStatus(status: CaseRecord["status"]): CaseStatus {
   }
 }
 
-function getDisplayValue(value: string) {
+function getDisplayValue(value: string | null | undefined) {
+  if (typeof value !== "string") {
+    return "—"
+  }
+
   return value.trim() ? value : "—"
 }
 
@@ -174,6 +152,7 @@ function buildAICaseInput(record: CaseRecord, sections: SectionConfig[]): AICase
     caseId: record.id,
     title: record.title,
     status: record.status,
+    state: record.state,
     priority: record.priority || undefined,
     blockingReason: record.blockingReason || undefined,
     sections: sections.map((section) => ({
@@ -214,6 +193,7 @@ function detectAICaseSignals(input: AICaseInput): AICaseSignals {
   const combinedCaseText = [
     input.title,
     input.status,
+    input.state,
     input.priority ?? "",
     ...fieldEntries.flatMap((field) => [field.label, field.value ?? ""]),
   ]
@@ -223,79 +203,74 @@ function detectAICaseSignals(input: AICaseInput): AICaseSignals {
   const approvalRequiredValue = fieldEntries.find(
     (field) => field.label === "Approval required"
   )?.value
-  const assigneeValue = fieldEntries.find(
-    (field) => field.label === "Assignee"
-  )?.value
-
+  const breachRiskValue = fieldEntries.find(
+    (field) => field.label === "Breach risk"
+  )?.value ?? ""
+  const categoryValue = fieldEntries.find(
+    (field) => field.label === "Category"
+  )?.value ?? ""
+  const productAreaValue = fieldEntries.find(
+    (field) => field.label === "Product area"
+  )?.value ?? ""
   const hasKeyword = (keywords: string[]) =>
     keywords.some((keyword) => combinedCaseText.includes(keyword))
 
   return {
-    status: input.status,
-    priority: input.priority,
-    assignee: assigneeValue ?? undefined,
-    blockingReason: input.blockingReason ?? "",
-    isEscalated: input.status === "Escalated",
-    isWaitingOnCustomer: input.status === "Waiting on customer",
-    isHighPriority:
-      input.priority === "High" || input.priority === "Critical",
-    needsApproval: approvalRequiredValue === "Yes",
-    isMigrationRelated: hasKeyword(["migration", "tenant", "sync"]),
-    isVisibilityIssue: hasKeyword(["visibility", "permission", "permissions", "access scope"]),
-    isAuthRelated: hasKeyword(["authentication", "identity", "password", "login", "access"]),
+    breachRisk: breachRiskValue,
+    hasExternalDependency:
+      approvalRequiredValue === "Yes" ||
+      input.blockingReason === "awaiting_approval" ||
+      input.blockingReason === "awaiting_engineering_fix",
+    hasMultiEntityImpact: hasKeyword(["merged", "merge", "multi-market", "multi-region", "across all clinics", "cross-border", "subset of clinics", "entities"]),
+    hasRevenueImpact:
+      [input.title, categoryValue, productAreaValue].join(" ").toLowerCase()
+        .includes("payment") ||
+      [input.title, categoryValue, productAreaValue].join(" ").toLowerCase()
+        .includes("tax") ||
+      [input.title, categoryValue, productAreaValue].join(" ").toLowerCase()
+        .includes("settlement") ||
+      [input.title, categoryValue, productAreaValue].join(" ").toLowerCase()
+        .includes("remittance"),
+    isReopened: hasKeyword(["reopened", "re-opened", "reopened the"]),
   }
 }
 
 function buildFakeSignalItems(signals: AICaseSignals): string[] {
   const items: string[] = []
 
-  if (signals.priority) {
-    items.push(`Priority: ${signals.priority}`)
+  if (signals.breachRisk === "High") {
+    items.push("SLA risk: High")
   }
 
-  if (signals.assignee) {
-    items.push(`Assignee: ${signals.assignee}`)
+  if (signals.hasMultiEntityImpact) {
+    items.push("Multi-entity impact")
+  }
+
+  if (signals.hasRevenueImpact) {
+    items.push("Revenue impact")
+  }
+
+  if (signals.hasExternalDependency) {
+    items.push("External dependency")
+  }
+
+  if (signals.isReopened) {
+    items.push("Reopened")
   }
 
   return items.slice(0, 2)
 }
 
-function getCaseIntent(signals: AICaseSignals): AIEvidenceSignal["intent"] {
-  if (signals.blockingReason !== "" && signals.blockingReason !== "none") {
+function getCaseIntent(input: Pick<AICaseInput, "status" | "blockingReason">): AIEvidenceSignal["intent"] {
+  if (input.blockingReason !== "" && input.blockingReason !== "none") {
     return "blocked"
   }
 
-  if (signals.status === "Resolved") {
+  if (input.status === "Resolved") {
     return "resolved"
   }
 
   return "progress"
-}
-
-function buildEventEvidenceLine(item?: ActivityTimelineItem) {
-  if (!item || typeof item.content !== "string") {
-    return null
-  }
-
-  const content = item.content.trim().replace(/\s+/g, " ")
-  const shortContent =
-    content.length > 112 ? `${content.slice(0, 109).trimEnd()}...` : content
-
-  switch (item.type) {
-    case "incoming":
-      return `Customer message: ${shortContent}`
-    case "outgoing":
-      return `Agent update: ${shortContent}`
-    case "comment":
-    case "internal":
-    case "internal-note":
-      return `Internal note: ${shortContent}`
-    case "status-change":
-      return `Status change: ${shortContent}`
-    case "system":
-    default:
-      return `System event: ${shortContent}`
-  }
 }
 
 function isFollowUpMessage(item?: ActivityTimelineItem) {
@@ -311,65 +286,437 @@ function isFollowUpMessage(item?: ActivityTimelineItem) {
   )
 }
 
-function buildFakeSummary(
-  evidenceSignal: AIEvidenceSignal,
+function normalizeInsightSentence(value: string) {
+  const trimmed = value.trim().replace(/\s+/g, " ")
+
+  if (!trimmed) {
+    return ""
+  }
+
+  return /[.!?]$/.test(trimmed) ? trimmed : `${trimmed}.`
+}
+
+function getOperationalConstraintObject(record: CaseRecord) {
+  const title = record.title.toLowerCase()
+
+  if (title.includes("invoice portal")) {
+    return "invoice portal access"
+  }
+
+  if (title.includes("duplicate payment confirmation")) {
+    return "duplicate payment correction"
+  }
+
+  if (title.includes("nightly sync") || record.productArea === "Tenant Data Sync") {
+    return "merged clinic invoice visibility"
+  }
+
+  if (title.includes("partial invoice list") || record.productArea === "Tenant Administration") {
+    return "merged-entity invoice visibility"
+  }
+
+  if (title.includes("vat labels") || record.productArea === "Invoice Export") {
+    return "VAT label configuration"
+  }
+
+  if (title.includes("settlement export") || record.productArea === "Settlement Export") {
+    return "settlement export adjustments"
+  }
+
+  if (title.includes("invoice reminders") || record.productArea === "Invoice Notifications") {
+    return "invoice reminder timing"
+  }
+
+  if (title.includes("statement branding") || record.productArea === "Statement Delivery") {
+    return "statement branding confirmation"
+  }
+
+  if (title.includes("tax rule") || record.productArea === "Tax Rules Engine") {
+    return "tax-rule correction"
+  }
+
+  if (title.includes("archived remittance") || record.productArea === "Remittance Archive") {
+    return "archived remittance access"
+  }
+
+  return record.productArea.trim()
+    ? record.productArea.trim().toLowerCase()
+    : "case resolution"
+}
+
+function getBlockingReasonConstraint(record: CaseRecord) {
+  const target = getOperationalConstraintObject(record)
+
+  switch (record.blockingReason) {
+    case "awaiting_customer_reply":
+      return `Waiting on customer for ${target}`
+    case "awaiting_customer_validation":
+      return `Waiting on customer for ${target} validation`
+    case "awaiting_approval":
+      return `Approval pending for ${target}`
+    case "awaiting_engineering_fix":
+      return `Blocked by engineering fix for ${target}`
+    default:
+      return ""
+  }
+}
+
+function compactOperationalConstraint(value: string, record: CaseRecord) {
+  const target = getOperationalConstraintObject(record)
+  let normalized = value
+    .trim()
+    .replace(/\s+/g, " ")
+    .replace(/[.!?]+$/, "")
+
+  if (!normalized) {
+    return ""
+  }
+
+  if (/^awaiting first response while /i.test(normalized)) {
+    normalized = normalized.split(/\s+while\s+/i)[1] ?? normalized
+  }
+
+  normalized = normalized
+    .replace(/^keep the rollback window open(?:\s+until.*)?$/i, `Rollback window open for ${target}`)
+    .replace(/^engineering is preparing a repair for the tenant-state sync job$/i, `Repair pending for ${target}`)
+    .replace(/^platform engineering is actively reviewing the visibility scopes$/i, `Waiting on platform engineering for ${target}`)
+    .replace(/^identity-service monitor detected (?:a|an) /i, "")
+    .replace(/^reconciliation monitor flagged (?:a|an) /i, "")
+    .replace(/^tenant propagation job reported /i, "")
+    .replace(/^confirmed that /i, "")
+    .replace(/^we confirm whether /i, "")
+    .replace(/^the /i, "")
+    .replace(/\s+(?:after|because|due to)\s+.*$/i, "")
+    .replace(/\s+(?:before|until)\s+.*$/i, "")
+    .replace(/^VAT labels can be configured per export template$/i, `Review pending for ${target}`)
+
+  if (/awaiting customer confirmation/i.test(normalized)) {
+    return `Waiting on customer for ${target} confirmation`
+  }
+
+  if (/tenant-state mismatch/i.test(normalized)) {
+    return `Blocked by tenant-state mismatch for ${target}`
+  }
+
+  if (/duplicate confirmation/i.test(normalized)) {
+    return `Review pending for ${target}`
+  }
+
+  if (/confirm whether/i.test(normalized) || /under review/i.test(normalized)) {
+    return `Review pending for ${target}`
+  }
+
+  if (/repair pending/i.test(normalized) || /repair /i.test(normalized)) {
+    return `Repair pending for ${target}`
+  }
+
+  return normalized
+}
+
+function extractOperationalConstraint(
+  record: CaseRecord,
+  timelineItems: ActivityTimelineItem[],
+): string {
+  if (record.status === "Resolved") {
+    return ""
+  }
+
+  const blockingReasonConstraint = getBlockingReasonConstraint(record)
+
+  if (blockingReasonConstraint) {
+    return blockingReasonConstraint
+  }
+
+  const compactStatusReason = record.statusReason
+    .trim()
+    .replace(/\s+/g, " ")
+    .split(/\s+(?:after|because|due to)\s+/i)[0]
+    .replace(/[.!?]+$/, "")
+  const normalizedStatusConstraint = compactOperationalConstraint(compactStatusReason, record)
+
+  if (
+    normalizedStatusConstraint &&
+    !normalizedStatusConstraint.toLowerCase().startsWith("escalated ") &&
+    !normalizedStatusConstraint.toLowerCase().startsWith("customer confirmed closure") &&
+    !normalizedStatusConstraint.toLowerCase().startsWith("archived files were restored")
+  ) {
+    return normalizedStatusConstraint
+  }
+
+  const latestOperationalEvent = [...timelineItems]
+    .reverse()
+    .find((item) =>
+      (item.type === "comment" ||
+        item.type === "internal" ||
+        item.type === "internal-note" ||
+        item.type === "system" ||
+        item.type === "status-change") &&
+      typeof item.content === "string"
+    )
+
+  if (!latestOperationalEvent || typeof latestOperationalEvent.content !== "string") {
+    return ""
+  }
+
+  const candidateSentences = latestOperationalEvent.content
+    .trim()
+    .replace(/\s+/g, " ")
+    .split(/(?<=[.!?])\s+/)
+    .map((sentence) => sentence.replace(/[.!?]+$/, "").trim())
+    .filter(Boolean)
+    .filter((sentence) => !/^(assigned to|case moved|case state moved|case ownership moved|chat intake routed|escalation routing matched)\b/i.test(sentence))
+
+  const selectedSentence = candidateSentences[0] ?? ""
+
+  return compactOperationalConstraint(selectedSentence, record)
+}
+
+function buildSituation(
+  record: CaseRecord,
   caseState: CaseState,
   timelineItems: ActivityTimelineItem[],
-): string[] {
-  const summary: string[] = []
-  const eventEvidenceLine = buildEventEvidenceLine(evidenceSignal.selectedEvent)
-  const latestCustomerMessage = [...timelineItems]
-    .reverse()
-    .find((item) => item.type === "incoming")
-  const latestOutboundAwaitingCustomerResponse =
-    findLatestOutboundAwaitingCustomerResponse(
-      timelineItems,
-      latestCustomerMessage,
-    )
+): AIRecordInsight["situation"] {
+  const primaryStateLabel = caseState.trim() || record.status
+  const ownershipValue = record.assignee.trim() && record.queue.trim()
+    ? `${record.assignee} · ${record.queue}`
+    : record.queue.trim()
+      ? record.queue
+      : record.assignee.trim()
+        ? record.assignee
+        : "Unassigned"
+  const operationalConstraint = extractOperationalConstraint(record, timelineItems)
+  const stateBadge = getCaseListStateBadge(caseState) ?? {
+    label: primaryStateLabel,
+    tone: "neutral" as const,
+    emphasis: "subtle" as const,
+  }
 
-  if (caseState === "Waiting for customer response") {
-    const customerMessage =
-      typeof latestCustomerMessage?.content === "string"
-        ? latestCustomerMessage.content.toLowerCase()
-        : ""
+  return [{
+    badge: stateBadge,
+    ownership: ownershipValue,
+    condition: operationalConstraint || undefined,
+  }]
+}
 
-    if (
-      customerMessage.includes("branding") ||
-      customerMessage.includes("statement")
-    ) {
-      summary.push(
-        "Customer still needs to confirm whether the corrected branding is right across the updated statements.",
-      )
-    } else {
-      summary.push(
-        "Customer still needs to confirm the latest requested details before the case can move forward.",
-      )
+function splitInsightSentences(value: string) {
+  return value
+    .trim()
+    .replace(/\s+/g, " ")
+    .match(/[^.!?]+[.!?]?/g)
+    ?.map((sentence) => sentence.trim())
+    .filter(Boolean) ?? []
+}
+
+function containsSummaryKeyword(value: string, keywords: string[]) {
+  const normalizedValue = value.toLowerCase()
+
+  return keywords.some((keyword) => normalizedValue.includes(keyword))
+}
+
+function isIssueSentence(value: string) {
+  return containsSummaryKeyword(value, [
+    "cannot",
+    "can't",
+    "unable",
+    "still",
+    "missing",
+    "delay",
+    "delaying",
+    "duplicate",
+    "mismatch",
+    "excluding",
+    "exclude",
+    "wrong",
+    "partial",
+    "question",
+    "rename",
+    "confirm whether",
+    "look paid twice",
+    "access",
+    "sign in",
+    "invoice",
+  ])
+}
+
+function isImpactSentence(value: string) {
+  return containsSummaryKeyword(value, [
+    "blocking",
+    "affect",
+    "affects",
+    "finance team",
+    "all clinics",
+    "across",
+    "today",
+    "manually",
+    "partial",
+    "same-day",
+    "need executive visibility",
+    "sign this off",
+  ])
+}
+
+function isResolutionOnlySentence(value: string) {
+  return containsSummaryKeyword(value, [
+    "can close",
+    "close the incident",
+    "everything we need",
+    "can sign in again",
+    "access was restored",
+    "invoices are visible",
+    "thanks for the summary",
+    "confirmed access was restored",
+  ])
+}
+
+function normalizeSummarySentence(
+  value: string,
+  type: ActivityTimelineItem["type"],
+): string {
+  let normalizedValue = value.trim().replace(/\s+/g, " ")
+
+  if (!normalizedValue) {
+    return ""
+  }
+
+  if (type === "incoming") {
+    normalizedValue = normalizedValue
+      .replace(/^hi[, ]*/i, "")
+      .replace(/\bwe're\b/ig, "Customer is")
+      .replace(/\bwe are\b/ig, "Customer is")
+      .replace(/\bwe still need to\b/ig, "Customer still needs to")
+      .replace(/\bwe need to\b/ig, "Customer needs to")
+      .replace(/\bwe still\b/ig, "Customer still")
+      .replace(/\bwe\b/ig, "Customer")
+      .replace(/\bour\b/ig, "their")
+
+    if (normalizedValue.endsWith("?")) {
+      return ""
     }
+  } else {
+    normalizedValue = normalizedValue
+      .replace(/^confirmed that\b/i, "")
+      .replace(/^internal note added to\b/i, "")
+      .replace(/^case moved from .* after\b/i, "")
+      .replace(/^routing engine\b/i, "The routing engine")
+      .trim()
+  }
 
-    summary.push(
-      isFollowUpMessage(latestOutboundAwaitingCustomerResponse)
-        ? "Support requested confirmation and sent a follow-up. The case is waiting for customer response."
-        : "Support requested confirmation and is waiting for customer response.",
+  return normalizeInsightSentence(normalizedValue)
+}
+
+function buildFallbackCaseSummary(record: CaseRecord): string[] {
+  const descriptionSentences = splitInsightSentences(record.description)
+
+  if (descriptionSentences.length > 0) {
+    return descriptionSentences
+      .map((sentence) => normalizeInsightSentence(sentence))
+      .filter(Boolean)
+      .slice(0, 2)
+  }
+
+  const fallbackSummary = [normalizeInsightSentence(record.title)]
+  const categoryContext = record.category.trim()
+    ? normalizeInsightSentence(`Context: ${record.category}.`)
+    : ""
+
+  if (categoryContext) {
+    fallbackSummary.push(categoryContext)
+  }
+
+  return fallbackSummary.filter(Boolean).slice(0, 2)
+}
+
+function findLatestCaseSummarySource(timelineItems: ActivityTimelineItem[]) {
+  const latestCustomerIssue = [...timelineItems]
+    .reverse()
+    .find((item) =>
+      item.type === "incoming" &&
+      typeof item.content === "string" &&
+      splitInsightSentences(item.content).some(
+        (sentence) => isIssueSentence(sentence) && !isResolutionOnlySentence(sentence),
+      )
     )
 
-    return summary.slice(0, 2)
+  if (latestCustomerIssue) {
+    return latestCustomerIssue
   }
 
-  if (evidenceSignal.intent === "resolved") {
-    summary.push("The latest record documents the resolution path and the customer-facing closure context.")
-  } else if (evidenceSignal.selectedEvent?.type === "incoming") {
-    summary.push("The latest customer message captures the open request that support is working from.")
-  } else if (evidenceSignal.selectedEvent?.type === "outgoing") {
-    summary.push("The latest customer-facing update shows what support has already communicated.")
-  } else {
-    summary.push("Recent internal activity captures the current working context for the case.")
+  const latestInternalNote = [...timelineItems]
+    .reverse()
+    .find((item) =>
+      (item.type === "comment" || item.type === "internal" || item.type === "internal-note") &&
+      typeof item.content === "string",
+    )
+
+  if (latestInternalNote) {
+    return latestInternalNote
   }
 
-  if (eventEvidenceLine) {
-    summary.push(eventEvidenceLine)
+  return [...timelineItems]
+    .reverse()
+    .find((item) =>
+      (item.type === "system" || item.type === "status-change") &&
+      typeof item.content === "string",
+    )
+}
+
+function buildCaseSummary(record: CaseRecord, timelineItems: ActivityTimelineItem[]): string[] {
+  const sourceItem = findLatestCaseSummarySource(timelineItems)
+  const fallbackSummary = buildFallbackCaseSummary(record)
+
+  if (!sourceItem || typeof sourceItem.content !== "string") {
+    return fallbackSummary
   }
 
-  return summary.slice(0, 2)
+  const sourceSentences = splitInsightSentences(sourceItem.content)
+  const descriptionSentences = splitInsightSentences(record.description)
+  const rawProblemSentence =
+    sourceSentences.find(
+      (sentence) => isIssueSentence(sentence) && !isResolutionOnlySentence(sentence),
+    ) ??
+    sourceSentences[0] ??
+    descriptionSentences[0] ??
+    record.title
+
+  const rawImpactSentence =
+    sourceSentences.find(
+      (sentence) =>
+        sentence !== rawProblemSentence &&
+        isImpactSentence(sentence) &&
+        !isResolutionOnlySentence(sentence),
+    ) ??
+    descriptionSentences.find(
+      (sentence) =>
+        sentence !== rawProblemSentence &&
+        isImpactSentence(sentence),
+    )
+
+  const normalizedProblemSentence =
+    normalizeSummarySentence(rawProblemSentence, sourceItem.type) ||
+    fallbackSummary[0] ||
+    normalizeInsightSentence(record.title)
+
+  const normalizedImpactSentence = rawImpactSentence
+    ? normalizeSummarySentence(rawImpactSentence, sourceItem.type) ||
+      normalizeInsightSentence(rawImpactSentence)
+    : ""
+
+  const summary = [
+    normalizedProblemSentence,
+    normalizedImpactSentence,
+  ].filter(
+    (sentence, index, sentences) =>
+      sentence &&
+      sentences.findIndex(
+        (candidate) => candidate.toLowerCase() === sentence.toLowerCase(),
+      ) === index,
+  )
+
+  if (summary.length < 2 && fallbackSummary[1]) {
+    summary.push(fallbackSummary[1])
+  }
+
+  return summary.slice(0, 3)
 }
 
 function getTimelineItemTimeValue(item?: ActivityTimelineItem) {
@@ -408,40 +755,74 @@ function findLatestOutboundAwaitingCustomerResponse(
 
 function deriveCaseState(
   record: CaseRecord,
-  timelineItems: ActivityTimelineItem[],
 ): CaseState {
-  if (!record.assignee.trim()) {
-    return "Needs assignment"
+  return record.state
+}
+
+function buildEscalationTimelineItem(reason: string, note: string): ActivityTimelineItem {
+  const createdAt = new Date()
+  const normalizedNote = note.trim()
+  const content = normalizedNote
+    ? `Case state set to Escalated. Reason: ${reason}. Note: ${normalizedNote}`
+    : `Case state set to Escalated. Reason: ${reason}.`
+
+  return {
+    id: `activity-escalation-${createdAt.getTime()}`,
+    timestamp: createdAt.toLocaleString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    }),
+    timestampDateTime: createdAt.toISOString(),
+    type: "status-change",
+    typeLabel: "State change",
+    actor: "You",
+    subtype: "Support operations",
+    organization: "VivaLaVita",
+    content,
   }
+}
 
-  const latestCustomerMessage = [...timelineItems]
-    .reverse()
-    .find((item) => item.type === "incoming")
-  const latestAgentMessage = [...timelineItems]
-    .reverse()
-    .find((item) => item.type === "outgoing")
-  const latestOutboundAwaitingCustomerResponse =
-    findLatestOutboundAwaitingCustomerResponse(
-      timelineItems,
-      latestCustomerMessage,
-    )
+function buildReassignmentTimelineItem(
+  assignee: string,
+  team: string,
+  note: string,
+): ActivityTimelineItem {
+  const createdAt = new Date()
+  const normalizedAssignee = assignee.trim()
+  const normalizedTeam = team.trim()
+  const normalizedNote = note.trim()
+  const ownershipSummary = [
+    normalizedAssignee ? `Assignee: ${normalizedAssignee}` : "",
+    normalizedTeam ? `Team: ${normalizedTeam}` : "",
+  ].filter(Boolean).join(". ")
+  const content = normalizedNote
+    ? `Case reassigned. ${ownershipSummary}. Note: ${normalizedNote}`
+    : `Case reassigned. ${ownershipSummary}.`
 
-  if (hasUnansweredCustomerMessage(latestCustomerMessage, latestAgentMessage)) {
-    return "Waiting for first response"
+  return {
+    id: `activity-reassignment-${createdAt.getTime()}`,
+    timestamp: createdAt.toLocaleString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    }),
+    timestampDateTime: createdAt.toISOString(),
+    type: "status-change",
+    typeLabel: "Ownership change",
+    actor: "You",
+    subtype: "Support operations",
+    organization: "VivaLaVita",
+    content,
   }
-
-  if (latestOutboundAwaitingCustomerResponse) {
-    return "Waiting for customer response"
-  }
-
-  if (record.status !== "Resolved" && timelineItems.some(indicatesInternalReview)) {
-    return "Waiting for internal review"
-  }
-
-  return "In investigation"
 }
 
 function buildFakeActions(
+  record: CaseRecord,
   evidenceSignal: AIEvidenceSignal,
   caseState: CaseState,
   timelineItems: ActivityTimelineItem[],
@@ -451,6 +832,7 @@ function buildFakeActions(
   reason?: string
 }[] {
   const actions: { label: string; referenceId?: string; reason?: string }[] = []
+  const productAreaLabel = record.productArea.trim() || "current scope"
   const selectedEvent = evidenceSignal.selectedEvent
   const actionReferenceId = selectedEvent?.id
   const selectedEventContent =
@@ -485,8 +867,33 @@ function buildFakeActions(
     actions.push({ label, referenceId, reason })
   }
 
-  if (evidenceSignal.intent === "blocked") {
-    if (caseState === "Waiting for customer response") {
+  if (evidenceSignal.intent === "resolved" || record.status === "Resolved") {
+    if (selectedEventContent.includes("close") || selectedEventContent.includes("resolved")) {
+      pushAction("Send closure confirmation", actionReferenceId, `Close the loop on ${productAreaLabel}.`)
+    }
+
+    pushAction("Document the resolution summary", actionReferenceId, "Capture the final customer-facing outcome.")
+    return actions.slice(0, 2)
+  }
+
+  switch (caseState) {
+    case "Escalated":
+      if (blockingReasonAction) {
+        pushAction(blockingReasonAction, actionReferenceId, `This is blocking progress for ${productAreaLabel}.`)
+      }
+
+      if (evidenceSignal.blockingReason === "awaiting_approval") {
+        pushAction("Route case to approval workflow", actionReferenceId, `Approval is required before changing ${productAreaLabel}.`)
+        pushAction("Notify stakeholder after routing", actionReferenceId, "Confirm the case is actively moving through escalation.")
+      } else if (evidenceSignal.blockingReason === "awaiting_engineering_fix") {
+        pushAction("Capture expected repair timing", actionReferenceId, `The next update depends on the ${productAreaLabel} repair window.`)
+        pushAction("Send stakeholder update after timing is confirmed", actionReferenceId, "Share the expected next milestone once it is firm.")
+      } else {
+        pushAction("Confirm the escalation owner", actionReferenceId, "Ensure there is one accountable escalation lead.")
+        pushAction("Document the next escalation step", actionReferenceId, "Make the immediate handoff or dependency explicit.")
+      }
+      break
+    case "Waiting on customer": {
       const hasRecentFollowUp = isFollowUpMessage(
         latestOutboundAwaitingCustomerResponse,
       )
@@ -495,136 +902,69 @@ function buildFakeActions(
         pushAction(
           "Follow up with customer",
           latestOutboundAwaitingCustomerResponse.id,
-          "Waiting for customer confirmation",
+          `Still waiting on customer confirmation for ${productAreaLabel}.`,
         )
       }
 
-      if (latestCustomerMessage) {
-        pushAction("Review customer message", latestCustomerMessage.id)
+      pushAction("Confirm the exact validation still needed", actionReferenceId, "Name the customer response needed to move the case forward.")
+      pushAction("Update the internal note with the pending customer dependency", actionReferenceId, "Keep the blocked condition explicit for the next owner.")
+      break
+    }
+    case "Waiting for internal review":
+      if (blockingReasonAction) {
+        pushAction(blockingReasonAction, actionReferenceId, `This is the active blocker for ${productAreaLabel}.`)
       }
 
-      return actions.slice(0, 2)
-    }
-
-    if (blockingReasonAction) {
-      pushAction(blockingReasonAction)
-    }
-
-    switch (evidenceSignal.blockingReason) {
-      case "awaiting_customer_reply":
-        break
-      case "awaiting_customer_validation":
-        pushAction("Confirm validation steps")
-        break
-      case "awaiting_approval":
-        pushAction("Route for approval")
-        break
-      case "awaiting_engineering_fix":
-        pushAction("Check fix status")
-        break
-      default:
-        break
-    }
-
-    switch (selectedEvent?.type) {
-      case "incoming":
-        pushAction("Review customer message")
-        break
-      case "comment":
-      case "internal":
-      case "internal-note":
-        pushAction("Review case context")
-        break
-      case "status-change":
-      case "system":
-        pushAction("Verify blocker status")
-        break
-      default:
-        break
-    }
-
-    return actions.slice(0, 3)
-  }
-
-  if (evidenceSignal.intent === "resolved") {
-    if (selectedEventContent.includes("close") || selectedEventContent.includes("resolved")) {
-      pushAction("Confirm closure record")
-    }
-
-    if (selectedEvent?.type === "outgoing" || selectedEvent?.type === "incoming") {
-      pushAction("Send closure confirmation")
-    } else {
-      pushAction("Archive resolution notes")
-    }
-
-    return actions.slice(0, 2)
-  }
-  switch (selectedEvent?.type) {
-    case "incoming":
-      if (
-        caseState === "Waiting for first response" &&
-        customerIsLastSpeaker &&
-        latestCustomerMessage
-      ) {
-        pushAction("Reply to customer", latestCustomerMessage.id)
+      if (evidenceSignal.blockingReason === "awaiting_approval") {
+        pushAction("Route case to approval workflow", actionReferenceId, `Approval is required before proceeding with ${productAreaLabel}.`)
+        pushAction("Notify stakeholder after routing", actionReferenceId, "Confirm the approval path and next checkpoint.")
+      } else if (evidenceSignal.blockingReason === "awaiting_engineering_fix") {
+        pushAction("Capture expected repair timing", actionReferenceId, `Engineering timing is needed before the next ${productAreaLabel} update.`)
+        pushAction("Send customer update after timing is confirmed", actionReferenceId, "Translate the internal dependency into a clear external update.")
       } else {
-        pushAction("Wait for customer response", latestAgentMessage?.id)
+        pushAction("Record the review outcome in the internal note", actionReferenceId, "Preserve the decision path for the next handoff.")
+        pushAction("Prepare the next customer update", actionReferenceId, `Keep the customer informed about the ${productAreaLabel} review.`)
       }
-      pushAction("Confirm needed details")
       break
-    case "outgoing":
-      pushAction("Track customer response")
-      pushAction("Continue current work")
+    case "Waiting for first response":
+      if (customerIsLastSpeaker && latestCustomerMessage) {
+        pushAction("Reply to customer", latestCustomerMessage.id, `Start the case with the first response on ${productAreaLabel}.`)
+      }
+
+      pushAction("Confirm the missing details needed to start work", actionReferenceId, "Collect the minimum detail needed to route or resolve the case.")
+      pushAction("Set the next owner after the first response", actionReferenceId, "Make ownership explicit once the response is sent.")
       break
-    case "comment":
-    case "internal":
-    case "internal-note":
-      pushAction("Continue internal follow-up")
-      pushAction("Prepare customer update")
+    case "Needs assignment":
+      pushAction("Assign the case to the right team", actionReferenceId, `Route ${productAreaLabel} to the team that can act on it.`)
+      pushAction("Set the initial assignee", actionReferenceId, "Make one operator accountable for the next step.")
+      pushAction("Send the first response once ownership is set", actionReferenceId, "Avoid leaving the case unacknowledged after routing.")
       break
-    case "status-change":
-    case "system":
-      pushAction("Verify current case state")
-      pushAction("Continue current work")
+    case "In investigation":
+      pushAction("Confirm the investigation owner", actionReferenceId, `Keep ownership clear while ${productAreaLabel} is under investigation.`)
+      pushAction("Document the current working hypothesis", actionReferenceId, "Capture the leading explanation before the next handoff.")
+      pushAction("Prepare the next customer update", actionReferenceId, "Turn the current finding into a concise external update.")
       break
     default:
-      pushAction("Continue current work")
+      if (customerIsLastSpeaker && latestCustomerMessage) {
+        pushAction("Reply to customer", latestCustomerMessage.id, `Respond with the next step for ${productAreaLabel}.`)
+      }
+
+      pushAction("Document the current blocker in the internal note", actionReferenceId, "Make the active dependency easy to scan.")
+      pushAction("Prepare the next customer update", actionReferenceId, "Keep the next external step ready.")
       break
   }
 
   return actions.slice(0, 3)
 }
 
-function buildTimelineReferenceLabel(item: ActivityTimelineItem) {
-  const content = typeof item.content === "string" ? item.content.trim().replace(/\s+/g, " ") : ""
-  const shortContent =
-    content.length > 72 ? `${content.slice(0, 69).trimEnd()}...` : content
-
-  switch (item.type) {
-    case "incoming":
-      return `Customer report: ${shortContent}`
-    case "outgoing":
-      return `Agent update: ${shortContent}`
-    case "comment":
-    case "internal":
-    case "internal-note":
-      return `Internal note: ${shortContent}`
-    case "status-change":
-      return `Status change: ${shortContent}`
-    case "system":
-    default:
-      return `System event: ${shortContent}`
-  }
-}
-
 function selectReferenceItems(
-  signals: AICaseSignals,
+  input: AICaseInput,
   caseState: CaseState,
   timelineItems: ActivityTimelineItem[],
 ): ActivityTimelineItem[] {
   const references: ActivityTimelineItem[] = []
   const normalizedTimelineItems = [...timelineItems].reverse()
-  const caseIntent = getCaseIntent(signals)
+  const caseIntent = getCaseIntent(input)
 
   const addReference = (item?: ActivityTimelineItem) => {
     if (!item || references.some((reference) => reference.id === item.id)) {
@@ -688,14 +1028,10 @@ function selectReferenceItems(
       )
     )
 
-  if (caseState === "Waiting for customer response") {
+  if (caseState === "Waiting on customer") {
     addReference(findLatestOutboundCustomerRequest())
     addReference(findLatestCustomerMessage())
   } else if (caseIntent === "blocked") {
-    if (signals.isWaitingOnCustomer) {
-      addReference(findLatestCustomerMessage())
-    }
-
     addReference(findLatestInternalNote())
     addReference(findMeaningfulSystemEvent())
   } else if (caseIntent === "resolved") {
@@ -714,11 +1050,28 @@ function selectReferenceItems(
   return references.slice(0, 2)
 }
 
-function buildFakeReferences(referenceItems: ActivityTimelineItem[]): { id: string; label: string }[] {
-  return referenceItems.map((item) => ({
-    id: item.id,
-    label: buildTimelineReferenceLabel(item),
-  }))
+function buildTimelineTraceLabel(item: ActivityTimelineItem) {
+  const content = typeof item.content === "string"
+    ? item.content.trim().replace(/\s+/g, " ")
+    : ""
+  const shortContent =
+    content.length > 80 ? `${content.slice(0, 77).trimEnd()}...` : content
+
+  switch (item.type) {
+    case "incoming":
+      return `Customer: ${shortContent}`
+    case "outgoing":
+      return `Agent: ${shortContent}`
+    case "comment":
+    case "internal":
+    case "internal-note":
+      return `Internal note: ${shortContent}`
+    case "status-change":
+      return `State change: ${shortContent}`
+    case "system":
+    default:
+      return `System: ${shortContent}`
+  }
 }
 
 function formatAIUpdatedLabel(updatedAt: number) {
@@ -776,24 +1129,26 @@ function isElementVisibleInScrollRegion(element: HTMLElement) {
 }
 
 function getFakeAIRecordInsight(
+  record: CaseRecord,
   input: AICaseInput,
   _aiVersion: number,
   caseState: CaseState,
   timelineItems: ActivityTimelineItem[],
 ): AIRecordInsight {
   const signals = detectAICaseSignals(input)
-  const referenceItems = selectReferenceItems(signals, caseState, timelineItems)
+  const referenceItems = selectReferenceItems(input, caseState, timelineItems)
   const evidenceSignal: AIEvidenceSignal = {
-    intent: getCaseIntent(signals),
-    blockingReason: signals.blockingReason,
+    intent: getCaseIntent(input),
+    blockingReason: input.blockingReason ?? "",
     selectedEvent: referenceItems[0],
   }
 
   return {
+    situation: buildSituation(record, caseState, timelineItems),
+    caseSummary: buildCaseSummary(record, timelineItems),
     signals: buildFakeSignalItems(signals),
-    summary: buildFakeSummary(evidenceSignal, caseState, timelineItems),
-    actions: buildFakeActions(evidenceSignal, caseState, timelineItems),
-    references: buildFakeReferences(referenceItems),
+    actions: buildFakeActions(record, evidenceSignal, caseState, timelineItems),
+    basedOn: referenceItems.map(buildTimelineTraceLabel),
   }
 }
 
@@ -909,16 +1264,6 @@ function getPriorityDisplay(priority: CaseRecord["priority"]) {
 
 function getCaseListStatusDisplay(status: CaseRecord["status"]) {
   switch (status) {
-    case "Escalated":
-      return {
-        label: status,
-        className: "text-[color:var(--color-status-escalated)]",
-      }
-    case "Waiting on customer":
-      return {
-        label: status,
-        className: "text-[color:var(--color-status-waiting)]",
-      }
     case "Resolved":
       return {
         label: status,
@@ -935,6 +1280,44 @@ function getCaseListStatusDisplay(status: CaseRecord["status"]) {
         label: status,
         className: "text-[color:var(--color-status-in-progress)]",
       }
+  }
+}
+
+function getCaseListStateBadge(state: CaseState) {
+  switch (state) {
+    case "Escalated":
+      return {
+        label: state,
+        tone: "danger" as const,
+        emphasis: "subtle" as const,
+      }
+    case "Waiting on customer":
+      return {
+        label: state,
+        tone: "warning" as const,
+        emphasis: "subtle" as const,
+      }
+    case "Waiting for internal review":
+      return {
+        label: state,
+        tone: "warning" as const,
+        emphasis: "subtle" as const,
+      }
+    case "Waiting for first response":
+      return {
+        label: state,
+        tone: "info" as const,
+        emphasis: "subtle" as const,
+      }
+    case "Needs assignment":
+      return {
+        label: state,
+        tone: "neutral" as const,
+        emphasis: "subtle" as const,
+      }
+    case "":
+    default:
+      return null
   }
 }
 
@@ -1148,6 +1531,7 @@ function buildNewCaseRecord(): CaseRecord {
     id: "",
     title: "Customer cannot update invoice recipient after clinic transfer",
     status: "New",
+    state: "Waiting for first response",
     blockingReason: "",
     priority: "Medium",
     assignee: "Lucia Fernandez",
@@ -1314,9 +1698,12 @@ export function CaseScreenPage() {
     ...baseSelectedActivityTimelineItems,
     ...(appendedTimelineItemsByCaseId[selectedCaseId] ?? []),
   ]
-  const caseState = deriveCaseState(savedRecord, selectedActivityTimelineItems)
+  const caseState = deriveCaseState(savedRecord)
+  const showEscalateAction =
+    savedRecord.status !== "Resolved" && savedRecord.state !== "Escalated"
   const aiCaseInput = buildAICaseInput(savedRecord, aiSourceSections)
   const aiRecordInsight = getFakeAIRecordInsight(
+    savedRecord,
     aiCaseInput,
     aiVersion,
     caseState,
@@ -1427,29 +1814,6 @@ export function CaseScreenPage() {
   function refreshAIInsights() {
     setAiVersion((current) => current + 1)
     setAiUpdatedAt(() => Date.now())
-  }
-
-  function handleAIReferenceClick(referenceId: string) {
-    setRecordTab("activity")
-    setPendingTimelineReferenceId(referenceId)
-    setActiveSuggestedAction(null)
-  }
-
-  function handleAIActionClick(actionLabel: string, referenceId: string, reason?: string) {
-    setRecordTab("activity")
-    setPendingTimelineReferenceId(referenceId)
-
-    if (actionLabel === "Reply to customer" || actionLabel === "Follow up with customer") {
-      setActiveSuggestedAction({
-        label: actionLabel,
-        referenceId,
-        reason,
-        composerOpen: actionLabel === "Reply to customer",
-      })
-      return
-    }
-
-    setActiveSuggestedAction(null)
   }
 
   function enterEditMode() {
@@ -1570,6 +1934,89 @@ export function CaseScreenPage() {
       ...current,
       [selectedCaseId]: [...(current[selectedCaseId] ?? []), item],
     }))
+  }
+
+  function handleEscalateCase(reason: string, note: string) {
+    if (!selectedCaseId || savedRecord.status === "Resolved" || caseState === "Escalated") {
+      return
+    }
+
+    const trimmedReason = reason.trim()
+    const trimmedNote = note.trim()
+
+    if (!trimmedReason) {
+      return
+    }
+
+    const nextEscalationItem = buildEscalationTimelineItem(trimmedReason, trimmedNote)
+
+    setCases((currentCases) =>
+      currentCases.map((record) => (
+        record.id === selectedCaseId
+          ? {
+              ...record,
+              state: "Escalated",
+            }
+          : record
+      ))
+    )
+    setDraftRecord((current) => (
+      current.id === selectedCaseId
+        ? {
+            ...current,
+            state: "Escalated",
+          }
+        : current
+    ))
+    handleAppendTimelineItem(nextEscalationItem)
+    setRecordTab("activity")
+    setPendingTimelineReferenceId(nextEscalationItem.id)
+    setToastMessage("Case escalated")
+  }
+
+  function handleReassignCase(assignee: string, team: string, note: string) {
+    if (!selectedCaseId) {
+      return
+    }
+
+    const trimmedAssignee = assignee.trim()
+    const trimmedTeam = team.trim()
+    const trimmedNote = note.trim()
+
+    if (!trimmedAssignee && !trimmedTeam) {
+      return
+    }
+
+    const nextReassignmentItem = buildReassignmentTimelineItem(
+      trimmedAssignee,
+      trimmedTeam,
+      trimmedNote,
+    )
+
+    setCases((currentCases) =>
+      currentCases.map((record) => (
+        record.id === selectedCaseId
+          ? {
+              ...record,
+              assignee: trimmedAssignee || record.assignee,
+              queue: trimmedTeam || record.queue,
+            }
+          : record
+      ))
+    )
+    setDraftRecord((current) => (
+      current.id === selectedCaseId
+        ? {
+            ...current,
+            assignee: trimmedAssignee || current.assignee,
+            queue: trimmedTeam || current.queue,
+          }
+        : current
+    ))
+    handleAppendTimelineItem(nextReassignmentItem)
+    setRecordTab("activity")
+    setPendingTimelineReferenceId(nextReassignmentItem.id)
+    setToastMessage("Case reassigned")
   }
 
   function handleCancel() {
@@ -1775,6 +2222,7 @@ export function CaseScreenPage() {
                   {sortedCases.map((record) => {
                     const priorityDisplay = getPriorityDisplay(record.priority)
                     const statusDisplay = getCaseListStatusDisplay(record.status)
+                    const stateBadge = getCaseListStateBadge(record.state)
                     const updatedDisplay = formatCaseListUpdated(record.lastUpdate)
 
                     return (
@@ -1787,9 +2235,20 @@ export function CaseScreenPage() {
                       >
                         <div className="min-w-0 space-y-[var(--space-half)]">
                           <p className="text-[length:var(--text-meta)] leading-[var(--leading-normal)] text-[color:var(--color-text-secondary)] transition-colors group-hover:text-[color:var(--color-text-primary)] group-focus-visible:text-[color:var(--color-text-primary)]">
-                            {record.id}
+                            <span className="inline-flex flex-wrap items-center gap-[var(--space-2)]">
+                              <span>{record.id}</span>
+                              {stateBadge ? (
+                                <StatusBadge
+                                  tone={stateBadge.tone}
+                                  emphasis={stateBadge.emphasis}
+                                  size="sm"
+                                >
+                                  {stateBadge.label}
+                                </StatusBadge>
+                              ) : null}
+                            </span>
                           </p>
-                          <div className="flex min-w-0 items-start justify-between gap-[var(--space-2)]">
+                          <div className="flex min-w-0 items-start gap-[var(--space-2)]">
                             <p className="min-w-0 text-[length:var(--text-md)] leading-[var(--leading-normal)] font-medium text-[color:var(--color-text-primary)] transition-colors group-hover:text-[color:var(--color-text-brand)] group-focus-visible:text-[color:var(--color-text-brand)]">
                               {record.title}
                             </p>
@@ -1865,8 +2324,10 @@ export function CaseScreenPage() {
           onRecordTabChange={(tab) => setRecordTab(tab)}
           onBackToCases={handleBackToCases}
           onEnterEditMode={enterEditMode}
+          onEscalateCase={handleEscalateCase}
+          onReassignCase={handleReassignCase}
+          showEscalateAction={showEscalateAction}
           selectedActivityTimelineItems={selectedActivityTimelineItems}
-          caseState={caseState}
           highlightedTimelineItemId={highlightedTimelineItemId}
           activeSuggestedAction={activeSuggestedAction}
           onAppendTimelineItem={handleAppendTimelineItem}
@@ -1895,8 +2356,6 @@ export function CaseScreenPage() {
 
             setToastMessage("Follow-up sent to customer")
           }}
-          onAIReferenceClick={handleAIReferenceClick}
-          onAIActionClick={handleAIActionClick}
         />
       ) : (
         <>

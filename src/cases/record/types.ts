@@ -1,9 +1,21 @@
 import type { ReadOnlyValueBehavior } from "../../design-system/components/controls/ReadOnlyValue"
 
+export type CaseStatus = "New" | "In progress" | "Resolved"
+
+export type CaseState =
+  | ""
+  | "Needs assignment"
+  | "Waiting for first response"
+  | "Waiting on customer"
+  | "Waiting for internal review"
+  | "In investigation"
+  | "Escalated"
+
 export type CaseRecord = {
   title: string
   id: string
-  status: "New" | "In progress" | "Waiting on customer" | "Escalated" | "Resolved"
+  status: CaseStatus
+  state: CaseState
   blockingReason:
     | ""
     | "none"

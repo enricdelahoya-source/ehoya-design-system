@@ -2,9 +2,10 @@ import type { ActivityTimelineItem } from "../design-system/components/ActivityT
 import type { CaseRecord } from "../cases/record/types"
 
 export const INITIAL_CASE_RECORD: CaseRecord = {
-  title: "Customer cannot access invoice portal",
+  title: "Finance team still cannot access the invoice portal after password resets",
   id: "CASE-10482",
   status: "In progress",
+  state: "Waiting on customer",
   blockingReason: "awaiting_customer_validation",
   priority: "High",
   assignee: "Lucia Fernandez",
@@ -31,7 +32,7 @@ export const INITIAL_CASE_RECORD: CaseRecord = {
   contractType: "Enterprise subscription with 24/7 support addendum",
   routingGroup: "Portal Access Recovery",
   approvalRequired: "No",
-  approvalReason: "Leadership approval needed for accelerated customer credit.",
+  approvalReason: "",
   description:
     "Customer reset password twice and still cannot access the billing portal. Recent routing notes suggest a tenant-state mismatch between identity services and the billing portal.",
   internalNotes:
@@ -46,8 +47,9 @@ export const EXAMPLE_CASES: CaseRecord[] = [
   {
     ...INITIAL_CASE_RECORD,
     id: "CASE-10463",
-    title: "European clinic cannot reconcile duplicate payment confirmations in billing portal",
+    title: "Duplicate payment confirmations are making some invoices look paid twice",
     status: "In progress",
+    state: "In investigation",
     blockingReason: "none",
     priority: "Critical",
     assignee: "Jonas Weber",
@@ -62,7 +64,7 @@ export const EXAMPLE_CASES: CaseRecord[] = [
     source: "Customer Self-Service Portal",
     responseTarget: "2026-04-01 09:15 CET",
     resolutionTarget: "2026-04-01 13:00 CET",
-    firstResponse: "2026-04-01 08:58 CET",
+    firstResponse: "2026-04-01 08:55 CET",
     lastUpdate: "2026-04-01 11:22 CET",
     slaStatus: "At risk",
     breachRisk: "High",
@@ -71,7 +73,9 @@ export const EXAMPLE_CASES: CaseRecord[] = [
     email: "eva.kruger@nordstern.example",
     accountTier: "Enterprise",
     contractType: "Enterprise subscription",
-    routingGroup: "Payments Escalations",
+    routingGroup: "Payments Reconciliation",
+    approvalRequired: "No",
+    approvalReason: "",
     description:
       "Customer reports duplicate payment confirmation emails and mismatched invoice statuses after a batch of portal-submitted payments.",
     internalNotes:
@@ -83,8 +87,9 @@ export const EXAMPLE_CASES: CaseRecord[] = [
   {
     ...INITIAL_CASE_RECORD,
     id: "CASE-10511",
-    title: "Nightly tenant sync is delaying invoice visibility after clinic merge",
+    title: "Merged clinic invoices stay missing in the portal until the nightly sync completes",
     status: "In progress",
+    state: "Waiting for internal review",
     blockingReason: "awaiting_engineering_fix",
     priority: "High",
     assignee: "Marco Silva",
@@ -100,7 +105,7 @@ export const EXAMPLE_CASES: CaseRecord[] = [
     timelinePolicy: "Enterprise Plus - Standard Incident",
     responseTarget: "2026-04-01 11:00 CET",
     resolutionTarget: "2026-04-02 15:00 CET",
-    firstResponse: "2026-04-01 10:14 CET",
+    firstResponse: "2026-04-01 10:05 CET",
     lastUpdate: "2026-04-01 12:06 CET",
     slaStatus: "At risk",
     breachRisk: "Medium",
@@ -123,8 +128,9 @@ export const EXAMPLE_CASES: CaseRecord[] = [
   {
     ...INITIAL_CASE_RECORD,
     id: "CASE-10504",
-    title: "Escalated review for multi-market invoice visibility issue affecting finance administrators across merged clinic entities after tenant migration",
+    title: "Finance admins can only see a partial invoice list after the tenant migration",
     status: "In progress",
+    state: "Escalated",
     blockingReason: "none",
     priority: "High",
     assignee: "Amelie Laurent",
@@ -140,7 +146,7 @@ export const EXAMPLE_CASES: CaseRecord[] = [
     timelinePolicy: "Enterprise Plus - Executive Escalation",
     responseTarget: "2026-04-01 10:00 CET",
     resolutionTarget: "2026-04-02 12:00 CET",
-    firstResponse: "2026-04-01 09:18 CET",
+    firstResponse: "2026-04-01 09:26 CET",
     lastUpdate: "2026-04-01 12:34 CET",
     slaStatus: "At risk",
     breachRisk: "High",
@@ -150,8 +156,8 @@ export const EXAMPLE_CASES: CaseRecord[] = [
     accountTier: "Enterprise Plus",
     contractType: "Enterprise subscription with executive escalation coverage",
     routingGroup: "Platform Escalations",
-    approvalRequired: "Yes",
-    approvalReason: "Engineering manager approval required before running tenant visibility repair.",
+    approvalRequired: "No",
+    approvalReason: "",
     description:
       "Finance admins from merged entities can see only a partial subset of invoices after a tenant migration and permissions sync.",
     internalNotes:
@@ -163,8 +169,9 @@ export const EXAMPLE_CASES: CaseRecord[] = [
   {
     ...INITIAL_CASE_RECORD,
     id: "CASE-10388",
-    title: "New onboarding question about VAT labels in the invoice export",
+    title: "Can VAT labels be renamed in invoice exports?",
     status: "New",
+    state: "Waiting for first response",
     blockingReason: "",
     priority: "",
     assignee: "Anais Martin",
@@ -181,7 +188,7 @@ export const EXAMPLE_CASES: CaseRecord[] = [
     responseTarget: "2026-04-01 15:00 CET",
     resolutionTarget: "2026-04-03 17:00 CET",
     firstResponse: "",
-    lastUpdate: "2026-04-01 14:12 CET",
+    lastUpdate: "2026-04-01 14:16 CET",
     slaStatus: "On track",
     breachRisk: "Low",
     customer: "Vida Clara Centro Medico",
@@ -195,7 +202,7 @@ export const EXAMPLE_CASES: CaseRecord[] = [
     description:
       "Customer wants to understand whether VAT labels in exported invoices can be renamed for a local market workflow.",
     internalNotes:
-      "Useful sparse record to test missing owner and priority in both list and detail views.",
+      "Need to confirm whether VAT labels are configurable per export template or only at account level before sending the first response.",
     emailThreadId: "",
     callReference: "",
     chatSessionId: "CHAT-SES-440901",
@@ -203,18 +210,19 @@ export const EXAMPLE_CASES: CaseRecord[] = [
   {
     ...INITIAL_CASE_RECORD,
     id: "CASE-10412",
-    title: "Regional operations lead requests closure confirmation for resolved access incident",
+    title: "Finance users lost billing portal access at one clinic",
     status: "Resolved",
+    state: "",
     blockingReason: "none",
     priority: "Medium",
     assignee: "Chiara Marino",
     queue: "Customer Operations",
-    statusReason: "Access restored and customer notified. Waiting for formal closure acknowledgement.",
+    statusReason: "Customer confirmed closure after receiving the written resolution summary.",
     onHoldUntil: "",
     channel: "Email",
     severity: "Minor",
     productArea: "Billing Portal",
-    category: "Access & Authentication / Resolution confirmation",
+    category: "Access & Authentication / Portal access restoration",
     region: "Southern Europe",
     source: "Customer Support Mailbox",
     timelinePolicy: "Enterprise Standard",
@@ -233,9 +241,9 @@ export const EXAMPLE_CASES: CaseRecord[] = [
     approvalRequired: "No",
     approvalReason: "",
     description:
-      "Customer requested written confirmation that portal access was fully restored after the previous incident.",
+      "Finance users lost access to the billing portal until the account-state issue was repaired. The customer later requested a written resolution summary for their records.",
     internalNotes:
-      "Resolved example kept intentionally complete so the record page can be tested with a long, realistic lifecycle timeline.",
+      "Keep the IAM repair reference and written resolution summary linked in the record in case the clinic asks for the incident trail again.",
     emailThreadId: "THR-884140",
     callReference: "",
     chatSessionId: "",
@@ -243,8 +251,9 @@ export const EXAMPLE_CASES: CaseRecord[] = [
   {
     ...INITIAL_CASE_RECORD,
     id: "CASE-10516",
-    title: "Daily settlement export is excluding low-volume clinic adjustments",
+    title: "Low-volume clinic adjustments are missing from the daily settlement export",
     status: "In progress",
+    state: "In investigation",
     blockingReason: "none",
     priority: "Low",
     assignee: "Nadia Romero",
@@ -283,8 +292,9 @@ export const EXAMPLE_CASES: CaseRecord[] = [
   {
     ...INITIAL_CASE_RECORD,
     id: "CASE-10518",
-    title: "New request to configure reminder timing for overdue invoice notifications",
+    title: "Can overdue invoice reminders be delayed by two business days?",
     status: "New",
+    state: "Needs assignment",
     blockingReason: "",
     priority: "Medium",
     assignee: "",
@@ -301,7 +311,7 @@ export const EXAMPLE_CASES: CaseRecord[] = [
     responseTarget: "2026-04-11 09:30 CET",
     resolutionTarget: "2026-04-14 17:00 CET",
     firstResponse: "",
-    lastUpdate: "2026-04-11 08:12 CET",
+    lastUpdate: "2026-04-11 08:19 CET",
     slaStatus: "On track",
     breachRisk: "Low",
     customer: "Harborview Clinics",
@@ -315,7 +325,7 @@ export const EXAMPLE_CASES: CaseRecord[] = [
     description:
       "Customer wants to know whether overdue invoice reminders can be delayed by two business days for a subset of self-pay clinics.",
     internalNotes:
-      "Keep as a realistic new case example with enough data to test triage before an owner is assigned.",
+      "Confirm whether reminder cadence can be configured per clinic segment or only at account level before assigning the case to the notifications owner.",
     emailThreadId: "",
     callReference: "",
     chatSessionId: "CHAT-SES-441102",
@@ -323,8 +333,9 @@ export const EXAMPLE_CASES: CaseRecord[] = [
   {
     ...INITIAL_CASE_RECORD,
     id: "CASE-10519",
-    title: "Customer validation pending after statement branding fix in multi-region rollout",
+    title: "Customer still needs to confirm corrected statement branding across all clinics",
     status: "In progress",
+    state: "Waiting on customer",
     blockingReason: "awaiting_customer_reply",
     priority: "Medium",
     assignee: "Lucia Fernandez",
@@ -340,7 +351,7 @@ export const EXAMPLE_CASES: CaseRecord[] = [
     timelinePolicy: "Standard Support",
     responseTarget: "2026-04-10 10:00 CET",
     resolutionTarget: "2026-04-12 17:00 CET",
-    firstResponse: "2026-04-10 09:44 CET",
+    firstResponse: "2026-04-10 10:18 CET",
     lastUpdate: "2026-04-10 11:08 CET",
     slaStatus: "On track",
     breachRisk: "Low",
@@ -355,7 +366,7 @@ export const EXAMPLE_CASES: CaseRecord[] = [
     description:
       "Regenerated customer statements include the updated regional branding, but the customer has not yet confirmed the final output across all clinics.",
     internalNotes:
-      "Leave the case in waiting status until the customer validates the corrected statement layout in their production tenant.",
+      "Leave the case in the waiting state until the customer validates the corrected statement layout in their production tenant.",
     emailThreadId: "THR-884602",
     callReference: "",
     chatSessionId: "",
@@ -363,8 +374,9 @@ export const EXAMPLE_CASES: CaseRecord[] = [
   {
     ...INITIAL_CASE_RECORD,
     id: "CASE-10521",
-    title: "Executive escalation for tax-rule mismatch on cross-border invoice bundle",
+    title: "Cross-border invoice bundle is calculating with the wrong tax rule",
     status: "In progress",
+    state: "Escalated",
     blockingReason: "awaiting_approval",
     priority: "Critical",
     assignee: "Amelie Laurent",
@@ -403,8 +415,9 @@ export const EXAMPLE_CASES: CaseRecord[] = [
   {
     ...INITIAL_CASE_RECORD,
     id: "CASE-10509",
-    title: "Resolved clarification on archived remittance files for prior fiscal quarter",
+    title: "Customer needs access to archived remittance files from the prior fiscal quarter",
     status: "Resolved",
+    state: "",
     blockingReason: "none",
     priority: "Low",
     assignee: "Chiara Marino",
@@ -435,7 +448,7 @@ export const EXAMPLE_CASES: CaseRecord[] = [
     description:
       "Customer asked for access to archived remittance files from the prior fiscal quarter after their finance audit reopened a closed reconciliation task.",
     internalNotes:
-      "Leave as a recent resolved case so the triage list includes a realistic lower-priority closure example.",
+      "Link the restored archive package reference in the record and close the case once the audit request is fully documented.",
     emailThreadId: "",
     callReference: "",
     chatSessionId: "",
@@ -450,7 +463,7 @@ export const activityTimelineItems: ActivityTimelineItem[] = [
     type: "incoming",
     actor: "Marta Ruiz",
     subtype: "Customer",
-    organization: "Green Valley Clinic",
+    organization: "Viva la Vita Clinics SL",
     content:
       "Hi, we're still unable to access the invoice portal after resetting the password twice. This is blocking our finance team. Could you take a look?",
   },
@@ -458,55 +471,54 @@ export const activityTimelineItems: ActivityTimelineItem[] = [
     id: "activity-1",
     timestamp: "Apr 1, 2026, 09:07 CET",
     timestampDateTime: "2026-04-01T09:07:00+02:00",
-    type: "comment",
-    actor: "Lucia Fernandez",
-    subtype: "Support operations",
-    organization: "VivaLaVita",
-    content:
-      "Customer confirmed that invoice portal access still fails after two password resets and that the same issue affects the finance lead in the clinic group.",
-  },
-  {
-    id: "activity-1b",
-    timestamp: "Apr 1, 2026, 09:18 CET",
-    timestampDateTime: "2026-04-01T09:18:00+02:00",
     type: "outgoing",
     actor: "Lucia Fernandez",
     subtype: "Support agent",
     organization: "VivaLaVita",
     content:
-      "Hi Marta, thanks for reporting this. We’re currently investigating the issue with the invoice portal access. I’ll update you shortly once we confirm the root cause.",
+      "Thanks for flagging this, Marta. We've opened the case and are reviewing the invoice portal access state now. Please hold off on any additional password resets while we investigate.",
   },
   {
     id: "activity-2",
-    timestamp: "Apr 1, 2026, 09:26 CET",
-    timestampDateTime: "2026-04-01T09:26:00+02:00",
-    type: "status-change",
+    timestamp: "Apr 1, 2026, 09:18 CET",
+    timestampDateTime: "2026-04-01T09:18:00+02:00",
+    type: "comment",
     actor: "Lucia Fernandez",
     subtype: "Support operations",
     organization: "VivaLaVita",
     content:
-      "Case moved from New to In progress after support operations confirmed the incident is reproducible and requires account-state review.",
+      "Customer confirmed the same access failure affects the finance lead in the clinic group. Preserve the current session logs while IAM validates the tenant-state mismatch.",
   },
   {
     id: "activity-3",
-    timestamp: "Apr 1, 2026, 09:41 CET",
-    timestampDateTime: "2026-04-01T09:41:00+02:00",
+    timestamp: "Apr 1, 2026, 09:26 CET",
+    timestampDateTime: "2026-04-01T09:26:00+02:00",
     type: "system",
-    actor: "Auto-routing rule",
+    actor: "Identity monitor",
     subtype: "System",
     content:
-      "Routing engine reassigned the case to Billing Portal Support because recent tenant-state signals matched the portal access recovery workflow.",
+      "Identity-service monitor detected a tenant-state mismatch between billing portal access roles and the clinic account profile.",
   },
   {
     id: "activity-4",
-    timestamp: "Apr 1, 2026, 10:12 CET",
-    timestampDateTime: "2026-04-01T10:12:00+02:00",
-    type: "comment",
+    timestamp: "Apr 1, 2026, 09:34 CET",
+    timestampDateTime: "2026-04-01T09:34:00+02:00",
+    type: "status-change",
+    actor: "Auto-routing rule",
+    subtype: "System",
+    content:
+      "Case moved from New to In progress and was assigned to Billing Portal Support after the portal access recovery workflow matched the incident pattern.",
+  },
+  {
+    id: "activity-5",
+    timestamp: "Apr 1, 2026, 09:41 CET",
+    timestampDateTime: "2026-04-01T09:41:00+02:00",
+    type: "outgoing",
     actor: "Lucia Fernandez",
-    subtype: "Internal note",
+    subtype: "Support agent",
     organization: "VivaLaVita",
     content:
-      "Internal note added to preserve current session logs and wait for identity-service confirmation before asking the customer to attempt another login.",
+      "We've corrected the account state and resynchronized the affected finance roles. When you have a moment, could you confirm that the impacted users can sign in again and see their invoices?",
   },
 ]
 
@@ -526,8 +538,29 @@ export const activityTimelineItemsByCaseId: Record<string, ActivityTimelineItem[
     },
     {
       id: "case-10463-activity-1",
-      timestamp: "Apr 1, 2026, 08:58 CET",
-      timestampDateTime: "2026-04-01T08:58:00+02:00",
+      timestamp: "Apr 1, 2026, 08:49 CET",
+      timestampDateTime: "2026-04-01T08:49:00+02:00",
+      type: "system",
+      actor: "Routing engine",
+      subtype: "System",
+      content:
+        "Case ownership moved from General Support to Billing Operations after payment-batch signals matched the duplicate confirmation workflow.",
+    },
+    {
+      id: "case-10463-activity-2",
+      timestamp: "Apr 1, 2026, 08:55 CET",
+      timestampDateTime: "2026-04-01T08:55:00+02:00",
+      type: "outgoing",
+      actor: "Jonas Weber",
+      subtype: "Support agent",
+      organization: "VivaLaVita",
+      content:
+        "Thanks for reporting this. We're validating the duplicate confirmation pattern now and will confirm which invoices were actually affected before any corrections are made.",
+    },
+    {
+      id: "case-10463-activity-3",
+      timestamp: "Apr 1, 2026, 09:08 CET",
+      timestampDateTime: "2026-04-01T09:08:00+02:00",
       type: "comment",
       actor: "Jonas Weber",
       subtype: "Support operations",
@@ -536,7 +569,7 @@ export const activityTimelineItemsByCaseId: Record<string, ActivityTimelineItem[
         "Confirmed that duplicate confirmation records are tied to a single reconciliation window. Billing operations is reviewing webhook deduplication before any invoice repair.",
     },
     {
-      id: "case-10463-activity-2",
+      id: "case-10463-activity-4",
       timestamp: "Apr 1, 2026, 09:37 CET",
       timestampDateTime: "2026-04-01T09:37:00+02:00",
       type: "system",
@@ -546,7 +579,7 @@ export const activityTimelineItemsByCaseId: Record<string, ActivityTimelineItem[
         "Reconciliation monitor flagged a spike in duplicate confirmation events for the 08:00 CET payment batch.",
     },
     {
-      id: "case-10463-activity-3",
+      id: "case-10463-activity-5",
       timestamp: "Apr 1, 2026, 11:22 CET",
       timestampDateTime: "2026-04-01T11:22:00+02:00",
       type: "outgoing",
@@ -571,6 +604,17 @@ export const activityTimelineItemsByCaseId: Record<string, ActivityTimelineItem[
     },
     {
       id: "case-10511-activity-1",
+      timestamp: "Apr 1, 2026, 10:05 CET",
+      timestampDateTime: "2026-04-01T10:05:00+02:00",
+      type: "outgoing",
+      actor: "Marco Silva",
+      subtype: "Support agent",
+      organization: "VivaLaVita",
+      content:
+        "Thanks, Paolo. We've confirmed the tenant migration detail and are checking why the merged clinic invoices do not appear until the nightly sync completes.",
+    },
+    {
+      id: "case-10511-activity-2",
       timestamp: "Apr 1, 2026, 10:14 CET",
       timestampDateTime: "2026-04-01T10:14:00+02:00",
       type: "status-change",
@@ -581,7 +625,7 @@ export const activityTimelineItemsByCaseId: Record<string, ActivityTimelineItem[
         "Case moved from New to In progress after support confirmed the issue is reproducible and tied to a tenant-state sync delay.",
     },
     {
-      id: "case-10511-activity-2",
+      id: "case-10511-activity-3",
       timestamp: "Apr 1, 2026, 11:03 CET",
       timestampDateTime: "2026-04-01T11:03:00+02:00",
       type: "system",
@@ -591,7 +635,7 @@ export const activityTimelineItemsByCaseId: Record<string, ActivityTimelineItem[
         "Tenant propagation job reported delayed sync completion for merged clinic entities after the latest migration window.",
     },
     {
-      id: "case-10511-activity-3",
+      id: "case-10511-activity-4",
       timestamp: "Apr 1, 2026, 12:06 CET",
       timestampDateTime: "2026-04-01T12:06:00+02:00",
       type: "comment",
@@ -619,14 +663,26 @@ export const activityTimelineItemsByCaseId: Record<string, ActivityTimelineItem[
       timestamp: "Apr 1, 2026, 09:18 CET",
       timestampDateTime: "2026-04-01T09:18:00+02:00",
       type: "status-change",
+      typeLabel: "State change",
       actor: "Amelie Laurent",
       subtype: "Support operations",
       organization: "VivaLaVita",
       content:
-        "Case moved from In progress to Escalated and assigned to platform engineering for executive oversight while active investigation continues.",
+        "Case state moved to Escalated and ownership shifted to Platform Escalations after support confirmed the visibility issue affects multiple merged entities.",
     },
     {
       id: "case-10504-activity-2",
+      timestamp: "Apr 1, 2026, 09:26 CET",
+      timestampDateTime: "2026-04-01T09:26:00+02:00",
+      type: "outgoing",
+      actor: "Amelie Laurent",
+      subtype: "Support agent",
+      organization: "VivaLaVita",
+      content:
+        "We've escalated this to platform engineering and are treating it as a leadership-visible incident. We'll share the next confirmed findings in the next update window.",
+    },
+    {
+      id: "case-10504-activity-3",
       timestamp: "Apr 1, 2026, 10:02 CET",
       timestampDateTime: "2026-04-01T10:02:00+02:00",
       type: "system",
@@ -636,7 +692,18 @@ export const activityTimelineItemsByCaseId: Record<string, ActivityTimelineItem[
         "Escalation routing matched the case to the tenant migration visibility workflow and assigned executive escalation coverage.",
     },
     {
-      id: "case-10504-activity-3",
+      id: "case-10504-activity-4",
+      timestamp: "Apr 1, 2026, 11:08 CET",
+      timestampDateTime: "2026-04-01T11:08:00+02:00",
+      type: "comment",
+      actor: "Amelie Laurent",
+      subtype: "Internal note",
+      organization: "VivaLaVita",
+      content:
+        "Keep the rollback window open until platform engineering confirms the full invoice visibility scope across all merged entities.",
+    },
+    {
+      id: "case-10504-activity-5",
       timestamp: "Apr 1, 2026, 12:34 CET",
       timestampDateTime: "2026-04-01T12:34:00+02:00",
       type: "outgoing",
@@ -661,14 +728,24 @@ export const activityTimelineItemsByCaseId: Record<string, ActivityTimelineItem[
     },
     {
       id: "case-10388-activity-1",
+      timestamp: "Apr 1, 2026, 14:14 CET",
+      timestampDateTime: "2026-04-01T14:14:00+02:00",
+      type: "system",
+      actor: "Chat routing rule",
+      subtype: "System",
+      content:
+        "Chat intake routed the request to General Support because the customer asked for a configuration clarification rather than reporting an incident.",
+    },
+    {
+      id: "case-10388-activity-2",
       timestamp: "Apr 1, 2026, 14:16 CET",
       timestampDateTime: "2026-04-01T14:16:00+02:00",
       type: "comment",
-      actor: "Triage queue",
+      actor: "Anais Martin",
       subtype: "Support operations",
       organization: "VivaLaVita",
       content:
-        "New chat received. Needs ownership and product confirmation.",
+        "Assigned to General Support. Awaiting first response while we confirm whether VAT labels can be configured per export template.",
     },
   ],
   "CASE-10412": [
@@ -846,7 +923,221 @@ export const activityTimelineItemsByCaseId: Record<string, ActivityTimelineItem[
       subtype: "Internal note",
       organization: "VivaLaVita",
       content:
-        "Customer confirmation is still pending after the clarification request. Keep the case in waiting status until they validate the final statement set.",
+        "Customer confirmation is still pending after the clarification request. Keep the case in the waiting state until they validate the final statement set.",
+    },
+  ],
+  "CASE-10516": [
+    {
+      id: "case-10516-activity-0",
+      timestamp: "Apr 10, 2026, 10:48 CET",
+      timestampDateTime: "2026-04-10T10:48:00+02:00",
+      type: "incoming",
+      actor: "Irene Costa",
+      subtype: "Customer",
+      organization: "Clinica Mar Azul",
+      content:
+        "Today's settlement export is missing the low-volume adjustment rows for several clinics, so our finance team is reconciling them manually.",
+    },
+    {
+      id: "case-10516-activity-1",
+      timestamp: "Apr 10, 2026, 11:04 CET",
+      timestampDateTime: "2026-04-10T11:04:00+02:00",
+      type: "outgoing",
+      actor: "Nadia Romero",
+      subtype: "Support agent",
+      organization: "VivaLaVita",
+      content:
+        "Thanks for flagging this. We're validating the settlement export now and will confirm whether the missing adjustment rows are limited to the affected clinics.",
+    },
+    {
+      id: "case-10516-activity-2",
+      timestamp: "Apr 10, 2026, 11:26 CET",
+      timestampDateTime: "2026-04-10T11:26:00+02:00",
+      type: "system",
+      actor: "Export monitor",
+      subtype: "System",
+      content:
+        "Settlement export monitoring detected adjustment rows posted after the batch cutoff were omitted from the summary file for a subset of clinic entities.",
+    },
+    {
+      id: "case-10516-activity-3",
+      timestamp: "Apr 10, 2026, 12:03 CET",
+      timestampDateTime: "2026-04-10T12:03:00+02:00",
+      type: "status-change",
+      actor: "Routing engine",
+      subtype: "Support operations",
+      organization: "VivaLaVita",
+      content:
+        "Case ownership moved from Billing Operations to Finance Integrations after support confirmed the issue sits in settlement export logic rather than reconciliation workflow.",
+    },
+    {
+      id: "case-10516-activity-4",
+      timestamp: "Apr 11, 2026, 08:27 CET",
+      timestampDateTime: "2026-04-11T08:27:00+02:00",
+      type: "comment",
+      actor: "Nadia Romero",
+      subtype: "Internal note",
+      organization: "VivaLaVita",
+      content:
+        "Initial analysis suggests the export job skips low-volume adjustments that post after the batch window but before summary generation. Investigation remains active while we validate the affected clinics.",
+    },
+  ],
+  "CASE-10518": [
+    {
+      id: "case-10518-activity-0",
+      timestamp: "Apr 11, 2026, 08:12 CET",
+      timestampDateTime: "2026-04-11T08:12:00+02:00",
+      type: "incoming",
+      actor: "Tessa Morgan",
+      subtype: "Customer",
+      organization: "Harborview Clinics",
+      content:
+        "Can overdue invoice reminders be delayed by two business days for a subset of our self-pay clinics?",
+    },
+    {
+      id: "case-10518-activity-1",
+      timestamp: "Apr 11, 2026, 08:15 CET",
+      timestampDateTime: "2026-04-11T08:15:00+02:00",
+      type: "system",
+      actor: "Chat routing rule",
+      subtype: "System",
+      content:
+        "Chat intake routed the configuration request to General Support because no automation failure or delivery incident was detected.",
+    },
+    {
+      id: "case-10518-activity-2",
+      timestamp: "Apr 11, 2026, 08:19 CET",
+      timestampDateTime: "2026-04-11T08:19:00+02:00",
+      type: "comment",
+      actor: "Triage queue",
+      subtype: "Support operations",
+      organization: "VivaLaVita",
+      content:
+        "Queued for assignment. Need to confirm whether reminder cadence can be configured per clinic segment before sending the first response.",
+    },
+  ],
+  "CASE-10521": [
+    {
+      id: "case-10521-activity-0",
+      timestamp: "Apr 11, 2026, 08:31 CET",
+      timestampDateTime: "2026-04-11T08:31:00+02:00",
+      type: "incoming",
+      actor: "Lena Fischer",
+      subtype: "Customer",
+      organization: "Helios Care Network",
+      content:
+        "A subset of clinics in today's cross-border invoice bundle is calculating with the wrong tax rule. We need this corrected before the noon release.",
+    },
+    {
+      id: "case-10521-activity-1",
+      timestamp: "Apr 11, 2026, 08:52 CET",
+      timestampDateTime: "2026-04-11T08:52:00+02:00",
+      type: "outgoing",
+      actor: "Amelie Laurent",
+      subtype: "Support agent",
+      organization: "VivaLaVita",
+      content:
+        "We've opened an executive escalation and are validating the affected clinics now. We'll confirm the approval path before any tax-rule override is applied.",
+    },
+    {
+      id: "case-10521-activity-2",
+      timestamp: "Apr 11, 2026, 09:03 CET",
+      timestampDateTime: "2026-04-11T09:03:00+02:00",
+      type: "status-change",
+      typeLabel: "State change",
+      actor: "Amelie Laurent",
+      subtype: "Support operations",
+      organization: "VivaLaVita",
+      content:
+        "Case state moved to Escalated and ownership shifted to Platform Escalations because product and compliance approval is required before a production tax override.",
+    },
+    {
+      id: "case-10521-activity-3",
+      timestamp: "Apr 11, 2026, 09:11 CET",
+      timestampDateTime: "2026-04-11T09:11:00+02:00",
+      type: "system",
+      actor: "Approval workflow",
+      subtype: "System",
+      content:
+        "Approval workflow opened a product-and-compliance signoff request for the cross-border tax-rule override before the same-day invoice release.",
+    },
+    {
+      id: "case-10521-activity-4",
+      timestamp: "Apr 11, 2026, 09:18 CET",
+      timestampDateTime: "2026-04-11T09:18:00+02:00",
+      type: "comment",
+      actor: "Amelie Laurent",
+      subtype: "Internal note",
+      organization: "VivaLaVita",
+      content:
+        "Track approvals tightly before applying any corrective override to the production tax-rule set. Finance leadership needs the next checkpoint as soon as signoff is complete.",
+    },
+  ],
+  "CASE-10509": [
+    {
+      id: "case-10509-activity-0",
+      timestamp: "Apr 9, 2026, 13:28 CET",
+      timestampDateTime: "2026-04-09T13:28:00+02:00",
+      type: "incoming",
+      actor: "Miguel Ortega",
+      subtype: "Customer",
+      organization: "Clinica Vista Serena",
+      content:
+        "We need access to the archived remittance files from the prior fiscal quarter because our finance audit reopened the reconciliation review.",
+    },
+    {
+      id: "case-10509-activity-1",
+      timestamp: "Apr 9, 2026, 13:41 CET",
+      timestampDateTime: "2026-04-09T13:41:00+02:00",
+      type: "outgoing",
+      actor: "Chiara Marino",
+      subtype: "Support agent",
+      organization: "VivaLaVita",
+      content:
+        "Thanks, Miguel. We're restoring the archived package now and will confirm access once the prior-quarter remittance files are available.",
+    },
+    {
+      id: "case-10509-activity-2",
+      timestamp: "Apr 9, 2026, 14:22 CET",
+      timestampDateTime: "2026-04-09T14:22:00+02:00",
+      type: "system",
+      actor: "Archive retrieval workflow",
+      subtype: "System",
+      content:
+        "Archive retrieval started for the prior fiscal quarter remittance package and restored the secure download workspace for the requesting account.",
+    },
+    {
+      id: "case-10509-activity-3",
+      timestamp: "Apr 9, 2026, 15:08 CET",
+      timestampDateTime: "2026-04-09T15:08:00+02:00",
+      type: "comment",
+      actor: "Chiara Marino",
+      subtype: "Internal note",
+      organization: "VivaLaVita",
+      content:
+        "Validated that the restored package contains the full prior-quarter remittance file set requested by the finance audit team.",
+    },
+    {
+      id: "case-10509-activity-4",
+      timestamp: "Apr 9, 2026, 16:12 CET",
+      timestampDateTime: "2026-04-09T16:12:00+02:00",
+      type: "outgoing",
+      actor: "Chiara Marino",
+      subtype: "Support agent",
+      organization: "VivaLaVita",
+      content:
+        "We've restored access to the archived remittance package and shared the secure download instructions. Please confirm the files cover everything your audit team needs.",
+    },
+    {
+      id: "case-10509-activity-5",
+      timestamp: "Apr 9, 2026, 17:36 CET",
+      timestampDateTime: "2026-04-09T17:36:00+02:00",
+      type: "incoming",
+      actor: "Miguel Ortega",
+      subtype: "Customer",
+      organization: "Clinica Vista Serena",
+      content:
+        "Confirmed that we can access the full prior-quarter package now. This covers everything the audit team needed.",
     },
   ],
 }

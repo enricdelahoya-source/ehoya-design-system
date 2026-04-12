@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react"
+import { useEffect, useRef, useState, type ReactNode } from "react"
 import { renderCaseRecordSection } from "./renderers"
 import type {
   CaseRecord,
@@ -12,29 +12,35 @@ import ActivityTimeline, {
 } from "../../design-system/components/ActivityTimeline"
 import Button from "../../design-system/components/Button"
 import Drawer from "../../design-system/components/Drawer"
+import Field from "../../design-system/components/fields/Field"
 import Link from "../../design-system/components/Link"
+import StatusBadge, {
+  type StatusBadgeEmphasis,
+  type StatusBadgeTone,
+} from "../../design-system/components/StatusBadge"
 import Tabs from "../../design-system/components/Tabs"
+import Select from "../../design-system/components/controls/Select"
+import Textarea from "../../design-system/components/controls/Textarea"
 import RecordPageTemplate from "../../design-system/templates/RecordPageTemplate"
 
-export type CaseState =
-  | "Needs assignment"
-  | "Waiting for first response"
-  | "Waiting for customer response"
-  | "Waiting for internal review"
-  | "In investigation"
-
 type AIRecordInsight = {
+  situation: {
+    badge: {
+      label: string
+      tone: StatusBadgeTone
+      emphasis: StatusBadgeEmphasis
+    }
+    ownership: string
+    condition?: string
+  }[]
+  caseSummary: string[]
   signals: string[]
-  summary: string[]
   actions: {
     label: string
     referenceId?: string
     reason?: string
   }[]
-  references: {
-    id: string
-    label: string
-  }[]
+  basedOn: string[]
 }
 
 type CaseRecordTemplateProps = {
@@ -47,8 +53,10 @@ type CaseRecordTemplateProps = {
   onRecordTabChange: (tab: "details" | "activity") => void
   onBackToCases: () => void
   onEnterEditMode: () => void
+  onEscalateCase: (reason: string, note: string) => void
+  onReassignCase: (assignee: string, team: string, note: string) => void
+  showEscalateAction: boolean
   selectedActivityTimelineItems: ActivityTimelineItem[]
-  caseState: CaseState
   highlightedTimelineItemId: string | null
   activeSuggestedAction: ActiveSuggestedAction | null
   onAppendTimelineItem: (item: ActivityTimelineItem) => void
@@ -61,14 +69,40 @@ type CaseRecordTemplateProps = {
   aiRecordInsight: AIRecordInsight
   onRefreshAIInsights: () => void
   onSendSuggestedAction: (actionLabel: ActiveSuggestedAction["label"]) => void
-  onAIReferenceClick: (referenceId: string) => void
-  onAIActionClick: (actionLabel: string, referenceId: string, reason?: string) => void
 }
 
 const recordTabs = [
   { id: "details", label: "Details" },
   { id: "activity", label: "Activity" },
 ] as const
+
+const ESCALATION_REASON_OPTIONS = [
+  "Engineering dependency",
+  "Executive visibility",
+  "Approval required",
+  "Cross-team coordination",
+] as const
+
+const REASSIGNMENT_OPTIONS = {
+  Billing: [
+    "Lucia Fernandez",
+    "Jonas Weber",
+  ],
+  "Technical Support": [
+    "Marco Silva",
+    "Nadia Romero",
+  ],
+  "Customer Success": [
+    "Chiara Marino",
+    "Anais Martin",
+  ],
+  "Risk / Compliance": [
+    "Amelie Laurent",
+    "David Park",
+  ],
+} as const
+
+const REASSIGNMENT_TEAM_OPTIONS = Object.keys(REASSIGNMENT_OPTIONS)
 
 const asideTitleStyles = {
   fontSize: "var(--text-aside-title)",
@@ -88,8 +122,10 @@ export default function CaseRecordTemplate({
   onRecordTabChange,
   onBackToCases,
   onEnterEditMode,
+  onEscalateCase,
+  onReassignCase,
+  showEscalateAction,
   selectedActivityTimelineItems,
-  caseState,
   highlightedTimelineItemId,
   activeSuggestedAction,
   onAppendTimelineItem,
@@ -102,10 +138,17 @@ export default function CaseRecordTemplate({
   aiRecordInsight,
   onRefreshAIInsights,
   onSendSuggestedAction,
-  onAIReferenceClick,
-  onAIActionClick,
 }: CaseRecordTemplateProps) {
   const [completedSuggestedActionLabels, setCompletedSuggestedActionLabels] = useState<string[]>([])
+  const [isReassignOpen, setIsReassignOpen] = useState(false)
+  const [isEscalateOpen, setIsEscalateOpen] = useState(false)
+  const [isMoreActionsOpen, setIsMoreActionsOpen] = useState(false)
+  const [reassignmentAssignee, setReassignmentAssignee] = useState("")
+  const [reassignmentTeam, setReassignmentTeam] = useState("")
+  const [reassignmentNote, setReassignmentNote] = useState("")
+  const [escalationReason, setEscalationReason] = useState("")
+  const [escalationNote, setEscalationNote] = useState("")
+  const moreActionsRef = useRef<HTMLDivElement | null>(null)
   const visibleSuggestedActions = aiRecordInsight.actions.filter(
     (action) => !completedSuggestedActionLabels.includes(action.label),
   )
@@ -119,6 +162,114 @@ export default function CaseRecordTemplate({
   useEffect(() => {
     setCompletedSuggestedActionLabels([])
   }, [record.id])
+
+  useEffect(() => {
+    if (!isMoreActionsOpen) {
+      return
+    }
+
+    function handleDocumentMouseDown(event: MouseEvent) {
+      if (!moreActionsRef.current?.contains(event.target as Node)) {
+        setIsMoreActionsOpen(false)
+      }
+    }
+
+    document.addEventListener("mousedown", handleDocumentMouseDown)
+
+    return () => {
+      document.removeEventListener("mousedown", handleDocumentMouseDown)
+    }
+  }, [isMoreActionsOpen])
+
+  useEffect(() => {
+    setIsReassignOpen(false)
+    setIsEscalateOpen(false)
+    setIsMoreActionsOpen(false)
+    setReassignmentAssignee("")
+    setReassignmentTeam("")
+    setReassignmentNote("")
+    setEscalationReason("")
+    setEscalationNote("")
+  }, [record.id])
+
+  useEffect(() => {
+    if (!showEscalateAction) {
+      setIsEscalateOpen(false)
+      setEscalationReason("")
+      setEscalationNote("")
+    }
+  }, [showEscalateAction])
+
+  const trimmedReassignmentAssignee = reassignmentAssignee.trim()
+  const trimmedReassignmentTeam = reassignmentTeam.trim()
+  const trimmedReassignmentNote = reassignmentNote.trim()
+  const trimmedEscalationNote = escalationNote.trim()
+  const canSubmitReassignment =
+    trimmedReassignmentAssignee !== "" || trimmedReassignmentTeam !== ""
+  const reassignmentAssigneeOptions =
+    trimmedReassignmentTeam === ""
+      ? []
+      : REASSIGNMENT_OPTIONS[trimmedReassignmentTeam as keyof typeof REASSIGNMENT_OPTIONS] ?? []
+
+  function handleOpenReassignment() {
+    setIsEscalateOpen(false)
+    setIsReassignOpen(true)
+  }
+
+  function handleReassignmentTeamChange(nextTeam: string) {
+    setReassignmentTeam(nextTeam)
+    setReassignmentAssignee("")
+  }
+
+  function handleOpenEscalation() {
+    setIsReassignOpen(false)
+    setIsEscalateOpen(true)
+  }
+
+  function handleOpenReassignmentFromMenu() {
+    setIsMoreActionsOpen(false)
+    handleOpenReassignment()
+  }
+
+  function handleOpenEscalationFromMenu() {
+    setIsMoreActionsOpen(false)
+    handleOpenEscalation()
+  }
+
+  function handleCancelReassignment() {
+    setIsReassignOpen(false)
+    setReassignmentAssignee("")
+    setReassignmentTeam("")
+    setReassignmentNote("")
+  }
+
+  function handleConfirmReassignment() {
+    if (!canSubmitReassignment) {
+      return
+    }
+
+    onReassignCase(
+      trimmedReassignmentAssignee,
+      trimmedReassignmentTeam,
+      trimmedReassignmentNote,
+    )
+    handleCancelReassignment()
+  }
+
+  function handleCancelEscalation() {
+    setIsEscalateOpen(false)
+    setEscalationReason("")
+    setEscalationNote("")
+  }
+
+  function handleConfirmEscalation() {
+    if (!escalationReason) {
+      return
+    }
+
+    onEscalateCase(escalationReason, trimmedEscalationNote)
+    handleCancelEscalation()
+  }
 
   return (
     <RecordPageTemplate
@@ -139,13 +290,202 @@ export default function CaseRecordTemplate({
       status={status}
       metadata={headerMetadataItems.join(" • ")}
       actions={
-        <Button variant="secondary" onClick={onEnterEditMode}>
-          Edit
-        </Button>
+        <>
+          <div className="relative" ref={moreActionsRef}>
+            <Button
+              variant="secondary"
+              onClick={() => setIsMoreActionsOpen((current) => !current)}
+              aria-haspopup="menu"
+              aria-expanded={isMoreActionsOpen}
+            >
+              More actions
+            </Button>
+            {isMoreActionsOpen ? (
+              <div
+                role="menu"
+                aria-label="More actions"
+                className="absolute top-[calc(100%+var(--space-1))] left-0 z-10 min-w-[10rem] rounded-[var(--radius-sm)] border border-[var(--color-border-divider)] bg-[var(--color-surface-elevated)] py-[var(--space-1)]"
+              >
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={handleOpenReassignmentFromMenu}
+                  className="block w-full px-[var(--space-inline-sm)] py-[var(--space-1)] text-left text-sm leading-[var(--leading-normal)] text-[color:var(--color-text-primary)] transition-colors hover:bg-[var(--color-surface-muted)] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--color-focus-ring)]"
+                >
+                  Reassign
+                </button>
+                {showEscalateAction ? (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={handleOpenEscalationFromMenu}
+                    className="block w-full px-[var(--space-inline-sm)] py-[var(--space-1)] text-left text-sm leading-[var(--leading-normal)] text-[color:var(--color-text-primary)] transition-colors hover:bg-[var(--color-surface-muted)] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--color-focus-ring)]"
+                  >
+                    Escalate
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+          <Button variant="primary" onClick={onEnterEditMode}>
+            Edit
+          </Button>
+        </>
       }
       aiOpen={isAIDrawerOpen}
       mainContent={
         <>
+          {isReassignOpen ? (
+            <section
+              aria-label="Reassign case"
+              className="shrink-0 border-y border-[var(--color-border-divider)] py-[var(--space-4)]"
+            >
+              <div className="space-y-[var(--space-3)]">
+                <div className="space-y-[var(--space-half)]">
+                  <h2 className="m-0 text-[length:var(--text-md)] leading-[var(--leading-normal)] font-medium text-[color:var(--color-text-primary)]">
+                    Reassign case
+                  </h2>
+                  <p className="m-0 text-[length:var(--text-meta)] leading-[var(--leading-normal)] text-[color:var(--color-text-secondary)]">
+                    Update the ownership context before the case is reassigned.
+                  </p>
+                </div>
+
+                <div className="grid gap-[var(--space-3)] md:grid-cols-2">
+                  <Field label="Team" variant="tight">
+                    <Select
+                      size="sm"
+                      value={reassignmentTeam}
+                      onChange={(event) => handleReassignmentTeamChange(event.target.value)}
+                    >
+                      <option value="">Select a team</option>
+                      {REASSIGNMENT_TEAM_OPTIONS.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+
+                  <Field label="Assignee" variant="tight">
+                    <Select
+                      size="sm"
+                      value={reassignmentAssignee}
+                      onChange={(event) => setReassignmentAssignee(event.target.value)}
+                      disabled={trimmedReassignmentTeam === ""}
+                    >
+                      <option value="">
+                        {trimmedReassignmentTeam === ""
+                          ? "Select a team first"
+                          : "Select an assignee"}
+                      </option>
+                      {reassignmentAssigneeOptions.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+
+                  <div className="md:col-span-2">
+                    <Field label="Note" helper="Optional" variant="tight">
+                      <Textarea
+                        size="sm"
+                        value={reassignmentNote}
+                        onChange={(event) => setReassignmentNote(event.target.value)}
+                        placeholder="Add context for the reassignment"
+                      />
+                    </Field>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-[var(--space-2)]">
+                  <Button
+                    type="button"
+                    variant="primary"
+                    size="sm"
+                    disabled={!canSubmitReassignment}
+                    onClick={handleConfirmReassignment}
+                  >
+                    Reassign
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleCancelReassignment}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            </section>
+          ) : null}
+          {isEscalateOpen ? (
+            <section
+              aria-label="Escalate case"
+              className="shrink-0 border-y border-[var(--color-border-divider)] py-[var(--space-4)]"
+            >
+              <div className="space-y-[var(--space-3)]">
+                <div className="space-y-[var(--space-half)]">
+                  <h2 className="m-0 text-[length:var(--text-md)] leading-[var(--leading-normal)] font-medium text-[color:var(--color-text-primary)]">
+                    Escalate case
+                  </h2>
+                  <p className="m-0 text-[length:var(--text-meta)] leading-[var(--leading-normal)] text-[color:var(--color-text-secondary)]">
+                    Capture the escalation context before the case state is updated.
+                  </p>
+                </div>
+
+                <div className="grid gap-[var(--space-3)] md:grid-cols-2">
+                  <Field label="Reason" required variant="tight">
+                    <Select
+                      size="sm"
+                      value={escalationReason}
+                      onChange={(event) => setEscalationReason(event.target.value)}
+                    >
+                      <option value="">Select a reason</option>
+                      {ESCALATION_REASON_OPTIONS.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+
+                  <div className="md:col-span-2">
+                    <Field label="Note" helper="Optional" variant="tight">
+                      <Textarea
+                        size="sm"
+                        value={escalationNote}
+                        onChange={(event) => setEscalationNote(event.target.value)}
+                        placeholder="Add context for the escalation"
+                      />
+                    </Field>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-[var(--space-2)]">
+                  <Button
+                    type="button"
+                    variant="primary"
+                    size="sm"
+                    disabled={!escalationReason}
+                    onClick={handleConfirmEscalation}
+                  >
+                    Escalate
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleCancelEscalation}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            </section>
+          ) : null}
+
           <div className="shrink-0">
             <Tabs
               tabs={[...recordTabs]}
@@ -208,86 +548,77 @@ export default function CaseRecordTemplate({
                 onRefreshAIInsights()
               }}
             >
-              Refresh summary
+              Refresh insights
             </Link>
           }
         >
           <section className="space-y-[var(--space-2)]">
-            <h3 className="m-0" style={asideTitleStyles}>
-              Case signals
-            </h3>
-            <div className="pt-[var(--space-1)]">
-              <div className="grid gap-x-[var(--space-3)] gap-y-[var(--space-3)] sm:grid-cols-2">
-                <div className="min-w-0">
-                  <span className="text-[length:var(--text-meta)] leading-[var(--leading-normal)] text-[color:var(--color-text-muted)]">
-                    State:
-                  </span>
-                  {" "}
-                  <span className="text-[length:var(--text-meta)] leading-[var(--leading-normal)] text-[color:var(--color-text-primary)]">
-                    {caseState}
-                  </span>
-                </div>
-                {aiRecordInsight.signals.map((signal) => {
-                  const [label, value = ""] = signal.split(": ")
-
-                  return (
-                    <div key={signal} className="min-w-0">
-                      <span className="text-[length:var(--text-meta)] leading-[var(--leading-normal)] text-[color:var(--color-text-muted)]">
-                        {label}:
-                      </span>
-                      {" "}
-                      <span className="text-[length:var(--text-meta)] leading-[var(--leading-normal)] text-[color:var(--color-text-primary)]">
-                        {value}
-                      </span>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          </section>
-
-          <section className="mt-[var(--space-5)] space-y-[var(--space-2)]">
             <h3
               className="m-0 text-[color:var(--color-text-primary)]"
               style={asideTitleStyles}
             >
-              Summary
+              Case summary
             </h3>
-            <ul className="list-outside list-disc space-y-[var(--space-1)] pt-[var(--space-1)] pl-[var(--space-4)] marker:text-[color:var(--color-text-secondary)]">
-              {aiRecordInsight.summary.map((item) => (
-                <li key={item} className="text-sm leading-normal text-[color:var(--color-text-primary)]">
+            <div className="space-y-[var(--space-1)] pt-[var(--space-1)]">
+              {aiRecordInsight.caseSummary.map((item) => (
+                <p
+                  key={item}
+                  className="m-0 text-sm leading-normal text-[color:var(--color-text-primary)]"
+                >
                   {item}
-                </li>
-              ))}
-            </ul>
-            {aiRecordInsight.references.length > 0 ? (
-              <div className="space-y-[var(--space-1)] pt-[var(--space-1)]">
-                <p className="text-[length:var(--text-xs)] leading-[var(--leading-normal)] text-[color:var(--color-text-muted)]">
-                  Related activity
                 </p>
-                <div className="space-y-[var(--space-1)]">
-                  {aiRecordInsight.references.map((reference) => (
-                    selectedActivityTimelineItems.some((item) => item.id === reference.id) ? (
-                      <button
-                        key={reference.id}
-                        type="button"
-                        onClick={() => onAIReferenceClick(reference.id)}
-                        className="block w-full cursor-pointer py-[var(--space-half)] text-left text-[length:var(--text-meta)] leading-[var(--leading-normal)] text-[color:var(--color-text-secondary)] whitespace-normal break-words underline-offset-2 transition-colors hover:text-[color:var(--color-text-primary)] hover:underline focus-visible:rounded-[var(--radius-sm)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-focus-ring)]"
-                      >
-                        {reference.label}
-                      </button>
-                    ) : (
-                      <span
-                        key={reference.id}
-                        className="block w-full py-[var(--space-half)] text-left text-[length:var(--text-meta)] leading-[var(--leading-normal)] text-[color:var(--color-text-secondary)] whitespace-normal break-words"
-                      >
-                        {reference.label}
-                      </span>
-                    )
-                  ))}
+              ))}
+            </div>
+          </section>
+
+          {aiRecordInsight.signals.length > 0 ? (
+            <section className="mt-[var(--space-6)] space-y-[var(--space-2)]">
+              <h3 className="m-0" style={asideTitleStyles}>
+                Key factors
+              </h3>
+              <ul className="list-outside list-disc space-y-[var(--space-1)] pt-[var(--space-1)] pl-[var(--space-4)] marker:text-[color:var(--color-text-secondary)]">
+                {aiRecordInsight.signals.map((signal) => (
+                  <li
+                    key={signal}
+                    className="text-sm leading-normal text-[color:var(--color-text-primary)]"
+                  >
+                    {signal}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+
+          <section className="mt-[var(--space-6)] space-y-[var(--space-2)]">
+            <h3
+              className="m-0 text-[color:var(--color-text-primary)]"
+              style={asideTitleStyles}
+            >
+              Situation
+            </h3>
+            <div className="space-y-[var(--space-1)] pt-[var(--space-1)]">
+              {aiRecordInsight.situation.map((item) => (
+                <div key={`${item.badge.label}-${item.ownership}`} className="space-y-[var(--space-1)]">
+                  <div>
+                    <StatusBadge
+                      tone={item.badge.tone}
+                      emphasis={item.badge.emphasis}
+                      size="sm"
+                    >
+                      {item.badge.label}
+                    </StatusBadge>
+                  </div>
+                  <p className="m-0 text-[length:var(--text-meta)] leading-[var(--leading-normal)] text-[color:var(--color-text-primary)]">
+                    {`Owned by ${item.ownership}`}
+                  </p>
+                  {item.condition ? (
+                    <p className="m-0 text-[length:var(--text-meta)] leading-[var(--leading-normal)] text-[color:var(--color-text-primary)]">
+                      {item.condition}
+                    </p>
+                  ) : null}
                 </div>
-              </div>
-            ) : null}
+              ))}
+            </div>
           </section>
 
           <section className="mt-[var(--space-6)] space-y-[var(--space-2)]">
@@ -295,10 +626,10 @@ export default function CaseRecordTemplate({
               className="m-0 text-[color:var(--color-text-primary)]"
               style={asideTitleStyles}
             >
-              Suggested actions
+              Recommended actions
             </h3>
             <p className="text-[length:var(--text-xs)] leading-[var(--leading-normal)] text-[color:var(--color-text-muted)]">
-              Suggested next steps. Review before action.
+              Suggested next steps based on the current case state.
             </p>
             <ol className="list-outside list-decimal space-y-[var(--space-2)] pt-[var(--space-1)] pl-[var(--space-4)] marker:text-[color:var(--color-text-secondary)]">
               {visibleSuggestedActions.map((action) => (
@@ -306,22 +637,7 @@ export default function CaseRecordTemplate({
                   key={action.label}
                   className="text-sm leading-normal text-[color:var(--color-text-primary)]"
                 >
-                  {action.referenceId &&
-                  selectedActivityTimelineItems.some(
-                    (item) => item.id === action.referenceId
-                  ) ? (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        onAIActionClick(action.label, action.referenceId!, action.reason)
-                      }
-                      className="cursor-pointer text-left text-[color:inherit] underline-offset-2 transition-colors hover:text-[color:var(--color-text-primary)] hover:underline focus-visible:rounded-[var(--radius-sm)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-focus-ring)]"
-                    >
-                      {action.label}
-                    </button>
-                  ) : (
-                    action.label
-                  )}
+                  {action.label}
                   {action.reason ? (
                     <div className="pt-[var(--space-half)] text-[length:var(--text-xs)] leading-[var(--leading-normal)] text-[color:var(--color-text-muted)]">
                       {action.reason}
@@ -330,6 +646,22 @@ export default function CaseRecordTemplate({
                 </li>
               ))}
             </ol>
+          </section>
+
+          <section className="mt-[var(--space-6)] space-y-[var(--space-2)]">
+            <h3 className="m-0" style={asideTitleStyles}>
+              Based on
+            </h3>
+            <div className="space-y-[var(--space-1)] pt-[var(--space-1)]">
+              {aiRecordInsight.basedOn.map((item) => (
+                <p
+                  key={item}
+                  className="m-0 text-[length:var(--text-meta)] leading-[var(--leading-normal)] text-[color:var(--color-text-secondary)]"
+                >
+                  {item}
+                </p>
+              ))}
+            </div>
           </section>
         </Drawer>
       }
