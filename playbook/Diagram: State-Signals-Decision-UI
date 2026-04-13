@@ -1,0 +1,84 @@
+```mermaid
+flowchart TD
+
+    A[Case Data] --> B[State Resolver]
+
+    B --> C[Case State]
+    A --> D[Signals]
+
+    C --> E[Action Model<br/>(ACTIONS_BY_STATE)]
+    D --> F[Priority Rules<br/>(Overrides)]
+
+    E --> G[Default Primary Action]
+    F --> H[Adjusted Primary Action]
+
+    G --> I[Primary Selection]
+    H --> I
+
+    I --> J{Primary exists?}
+
+    J -->|Yes| K[Render Primary Action]
+    J -->|No| L[No Primary Action]
+
+    I --> M[Secondary Actions<br/>(Filtered)]
+
+    K --> N[UI Panel]
+    L --> N
+    M --> N
+
+    N --> O[Explanation Layer<br/>(State + Signals + Decision)]
+
+
+---
+
+# How to explain it (important for portfolio)
+
+When you use this, don’t just show it. Add a short framing like:
+
+### What this diagram shows
+
+- **State** defines what actions are valid  
+- **Signals** refine priority, but don’t create new actions  
+- **Decision layer** selects one primary action  
+- **UI** renders a consistent structure  
+- **Explanation** communicates the reasoning  
+
+---
+
+# Why this diagram works
+
+This is not just a flow.
+
+It clearly separates:
+
+### 1. System logic
+- state
+- action model
+
+### 2. Dynamic inputs
+- signals
+
+### 3. Decision layer
+- primary selection
+- overrides
+
+### 4. UI layer
+- rendering
+- explanation
+
+👉 That separation is exactly what makes your work feel **staff-level / architectural**
+
+---
+
+# Optional (if you want a stronger version later)
+
+You can evolve this into a second diagram:
+
+### “Example flow”
+
+```text
+CASE-10527
+→ escalated
+→ slaRisk: high
+→ override
+→ primary: notify stakeholder

@@ -1,0 +1,47 @@
+```mermaid
+flowchart TD
+
+    A[Edge Case 1<br/>Pending approval + High SLA risk] --> B[Resolve state]
+    B --> C[Case State = pending_approval]
+    A --> D[Signal = slaRisk: high]
+
+    C --> E[Default primary = Route to approval]
+    D --> F[Urgency signal detected]
+
+    E --> G[Priority rule check]
+    F --> G
+
+    G --> H[Constraint wins<br/>Approval dependency overrides urgency]
+
+    H --> I[Primary action<br/>Route case to approval workflow]
+    H --> J[Secondary action remains available<br/>Notify stakeholder]
+    H --> K[Explanation acknowledges urgency<br/>without changing primary]
+
+    L[Edge Case 2<br/>Waiting on customer + No action available] --> M[Resolve state]
+    M --> N[Case State = waiting_on_customer]
+    L --> O[Signal = noActionAvailable]
+
+    N --> P[Default primary = Send follow-up]
+    O --> Q[Suppression rule check]
+
+    P --> Q
+    Q --> R[No further action available]
+
+    R --> S[No primary action rendered]
+    R --> T[Secondary actions remain available]
+    R --> U[Explanation communicates intentional waiting]
+
+
+
+And this is the short explanation I’d place under it in a portfolio or doc:
+
+```md
+### Edge-case handling
+
+The model was tested against two non-happy-path scenarios:
+
+- **Conflicting signals**: when a case is both pending approval and at high SLA risk, the system keeps approval as the primary action. Urgency is acknowledged in the explanation, but it does not override a hard dependency.
+- **No-action state**: when a case is waiting on customer input and all planned follow-ups have already been sent, the system suppresses the primary action entirely. This avoids showing fake or redundant next steps.
+
+These cases helped validate that the action model can handle both priority conflicts and intentional inaction.
+z

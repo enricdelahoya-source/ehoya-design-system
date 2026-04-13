@@ -8,7 +8,7 @@ import CasesPage from "./cases/list/CasesListPage"
 const router = createBrowserRouter([
   {
     path: "/",
-    element: <Navigate to="/playground" replace />,
+    element: <Navigate to="/cases" replace />,
   },
   {
     path: "/playground",

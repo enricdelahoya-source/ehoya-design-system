@@ -1,4 +1,11 @@
 import { useEffect, useRef, useState, type ReactNode } from "react"
+import {
+  ACTION_LABELS,
+  getActionExplanation,
+  getPrimaryAction,
+  getSecondaryActions,
+  resolveCaseState,
+} from "./caseActions"
 import { renderCaseRecordSection } from "./renderers"
 import type {
   CaseRecord,
@@ -10,6 +17,7 @@ import ActivityTimeline, {
   type ActiveSuggestedAction,
   type ActivityTimelineItem,
 } from "../../design-system/components/ActivityTimeline"
+import ActionList from "../../design-system/components/ActionList"
 import Button from "../../design-system/components/Button"
 import Drawer from "../../design-system/components/Drawer"
 import Field from "../../design-system/components/fields/Field"
@@ -139,7 +147,6 @@ export default function CaseRecordTemplate({
   onRefreshAIInsights,
   onSendSuggestedAction,
 }: CaseRecordTemplateProps) {
-  const [completedSuggestedActionLabels, setCompletedSuggestedActionLabels] = useState<string[]>([])
   const [isReassignOpen, setIsReassignOpen] = useState(false)
   const [isEscalateOpen, setIsEscalateOpen] = useState(false)
   const [isMoreActionsOpen, setIsMoreActionsOpen] = useState(false)
@@ -149,19 +156,31 @@ export default function CaseRecordTemplate({
   const [escalationReason, setEscalationReason] = useState("")
   const [escalationNote, setEscalationNote] = useState("")
   const moreActionsRef = useRef<HTMLDivElement | null>(null)
-  const visibleSuggestedActions = aiRecordInsight.actions.filter(
-    (action) => !completedSuggestedActionLabels.includes(action.label),
+  const caseActionState = resolveCaseState(record)
+  const mockSignalRecord = record as CaseRecord & { followUpsSent?: number }
+  const caseSignals = {
+    slaRisk:
+      record.breachRisk === "High"
+        ? "high"
+        : record.breachRisk === "Medium"
+          ? "medium"
+          : "low",
+    noActionAvailable:
+      caseActionState === "waiting_on_customer" &&
+      (mockSignalRecord.followUpsSent ?? 0) >= 2,
+  } as const
+  const primaryAction = getPrimaryAction(caseActionState, caseSignals)
+  const primaryActionLabel = primaryAction ? ACTION_LABELS[primaryAction] : null
+  const secondaryActionLabels = getSecondaryActions(caseActionState, primaryAction).map(
+    (action) => ACTION_LABELS[action],
   )
+  const actionExplanation = getActionExplanation(caseActionState, caseSignals)
   const headerMetadataItems = [
     record.customer.trim(),
     record.assignee.trim(),
     record.priority.trim() ? `${record.priority} priority` : "",
     record.queue.trim(),
   ].filter(Boolean)
-
-  useEffect(() => {
-    setCompletedSuggestedActionLabels([])
-  }, [record.id])
 
   useEffect(() => {
     if (!isMoreActionsOpen) {
@@ -513,11 +532,6 @@ export default function CaseRecordTemplate({
                   highlightedItemId={highlightedTimelineItemId}
                   activeSuggestedAction={activeSuggestedAction}
                   onAppendTimelineItem={onAppendTimelineItem}
-                  onCompleteSuggestedAction={(actionLabel) =>
-                    setCompletedSuggestedActionLabels((current) =>
-                      current.includes(actionLabel) ? current : [...current, actionLabel],
-                    )
-                  }
                   onSendSuggestedAction={onSendSuggestedAction}
                   onDismissSuggestedAction={onDismissSuggestedAction}
                   onOpenSuggestedActionComposer={onOpenSuggestedActionComposer}
@@ -621,31 +635,46 @@ export default function CaseRecordTemplate({
             </div>
           </section>
 
-          <section className="mt-[var(--space-6)] space-y-[var(--space-2)]">
-            <h3
-              className="m-0 text-[color:var(--color-text-primary)]"
-              style={asideTitleStyles}
-            >
-              Recommended actions
-            </h3>
-            <p className="text-[length:var(--text-xs)] leading-[var(--leading-normal)] text-[color:var(--color-text-muted)]">
-              Suggested next steps based on the current case state.
-            </p>
-            <ol className="list-outside list-decimal space-y-[var(--space-2)] pt-[var(--space-1)] pl-[var(--space-4)] marker:text-[color:var(--color-text-secondary)]">
-              {visibleSuggestedActions.map((action) => (
-                <li
-                  key={action.label}
-                  className="text-sm leading-normal text-[color:var(--color-text-primary)]"
+          <section className="mt-[var(--space-6)] border-b border-[var(--color-border-divider)] pb-[var(--space-5)]">
+            <div className="space-y-[var(--space-3)] pt-[var(--space-1)]">
+              <div className="space-y-[var(--space-1)]">
+                <h3
+                  className="m-0 text-[color:var(--color-text-primary)]"
+                  style={asideTitleStyles}
                 >
-                  {action.label}
-                  {action.reason ? (
-                    <div className="pt-[var(--space-half)] text-[length:var(--text-xs)] leading-[var(--leading-normal)] text-[color:var(--color-text-muted)]">
-                      {action.reason}
-                    </div>
+                  Next step
+                </h3>
+                <div className="space-y-[var(--space-1)] pt-[var(--space-half)]">
+                  <p className="m-0 text-sm leading-normal text-[color:var(--color-text-primary)]">
+                    {actionExplanation}
+                  </p>
+                  {primaryActionLabel ? (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      className="mt-[var(--space-2)] mb-[var(--space-2)] w-full"
+                    >
+                      {primaryActionLabel}
+                    </Button>
                   ) : null}
-                </li>
-              ))}
-            </ol>
+                </div>
+              </div>
+
+              <div className="space-y-[var(--space-1)] pt-[var(--space-2)]">
+                <p className="m-0 text-[length:var(--text-xs)] leading-[var(--leading-normal)] text-[color:var(--color-text-muted)]">
+                  Other actions
+                </p>
+                <div className="pt-[var(--space-half)]">
+                  <ActionList
+                    ariaLabel="Other actions"
+                    items={secondaryActionLabels.map((actionLabel) => ({
+                      label: actionLabel,
+                    }))}
+                  />
+                </div>
+              </div>
+            </div>
           </section>
 
           <section className="mt-[var(--space-6)] space-y-[var(--space-2)]">

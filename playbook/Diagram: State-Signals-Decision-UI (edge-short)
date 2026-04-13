@@ -1,0 +1,18 @@
+```mermaid
+flowchart LR
+
+    A[Pending approval<br/>+ High SLA risk] --> B[Constraint check]
+    B --> C[Keep approval as primary]
+    C --> D[Show urgency in explanation]
+    C --> E[Keep stakeholder notification as secondary]
+
+    F[Waiting on customer<br/>+ No action available] --> G[Action availability check]
+    G --> H[Suppress primary action]
+    H --> I[Keep secondary actions]
+    H --> J[Explain intentional waiting]
+
+
+
+My recommendation:
+- use the **first version** in internal docs
+- use the **second version** in the portfolio, because it’s easier to scan.
