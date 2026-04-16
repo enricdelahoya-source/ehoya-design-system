@@ -119,17 +119,20 @@ export function getActionExplanation(state: CaseState, signals: CaseSignal): str
 }
 
 export function resolveCaseState(
-  record: Pick<CaseRecord, "blockingReason" | "status" | "state" | "statusReason">,
+  record: Pick<CaseRecord, "blockingReason" | "status" | "signals" | "primarySignal" | "statusReason">,
 ): CaseState {
-  const normalizedStatus = String(record.status)
   const normalizedStatusReason = record.statusReason.trim().toLowerCase()
+
+  if (record.status === "resolved") {
+    return "closed"
+  }
 
   if (record.blockingReason === "awaiting_approval") {
     return "pending_approval"
   }
 
   if (
-    record.state === "Waiting on customer" ||
+    record.signals.waitingOnCustomer ||
     record.blockingReason === "awaiting_customer_reply" ||
     record.blockingReason === "awaiting_customer_validation"
   ) {
@@ -140,8 +143,16 @@ export function resolveCaseState(
     return "ready_to_resolve"
   }
 
-  if (normalizedStatus === "Escalated" || record.state === "Escalated") {
+  if (record.primarySignal === "escalated" || record.signals.escalated) {
     return "escalated"
+  }
+
+  if (
+    record.primarySignal === "needs_assignment" ||
+    record.primarySignal === "waiting_for_first_response" ||
+    record.status === "new"
+  ) {
+    return "triage"
   }
 
   return "investigating"

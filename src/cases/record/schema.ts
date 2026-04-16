@@ -7,7 +7,7 @@ import type {
 } from "./types"
 
 function shouldShowStatusReason(record: CaseRecord) {
-  return record.status === "Resolved" || record.statusReason.trim().length > 0
+  return record.status === "resolved" || record.statusReason.trim().length > 0
 }
 
 function shouldShowBlockingReason(record: CaseRecord) {
@@ -33,9 +33,9 @@ function getChannelReferenceLabel(channel: CaseRecord["channel"]) {
 }
 
 export const STATUS_OPTIONS: FieldOption[] = [
-  { value: "New", label: "New" },
-  { value: "In progress", label: "In progress" },
-  { value: "Resolved", label: "Resolved" },
+  { value: "new", label: "New" },
+  { value: "in_progress", label: "In progress" },
+  { value: "resolved", label: "Resolved" },
 ]
 
 const PRIORITY_OPTIONS: FieldOption[] = [

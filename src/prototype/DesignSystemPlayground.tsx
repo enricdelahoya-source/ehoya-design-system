@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react"
 import CasesListTemplate from "../cases/list/CasesListTemplate"
 import CaseRecordTemplate from "../cases/record/CaseRecordTemplate"
+import { EMPTY_CASE_SIGNALS, getPrimarySignal } from "../cases/record/caseSignals"
 import { renderCaseRecordSection } from "../cases/record/renderers"
 import { getCaseRecordSections, STATUS_OPTIONS } from "../cases/record/schema"
-import type { CaseRecord, CaseState, SectionConfig } from "../cases/record/types"
+import type { CasePrimarySignal, CaseRecord, CaseState, SectionConfig } from "../cases/record/types"
 import Button from "../design-system/components/Button"
 import CaseStatusBadge, { type CaseStatus } from "../design-system/components/CaseStatusBadge"
 import ActivityTimeline, {
@@ -15,6 +16,7 @@ import ReadOnlyValue from "../design-system/components/controls/ReadOnlyValue"
 import Field from "../design-system/components/fields/Field"
 import FieldGroupStack from "../design-system/components/field-groups/FieldGroupStack"
 import FormFieldGrid from "../design-system/components/field-groups/FormFieldGrid"
+import FilterChip from "../design-system/components/FilterChip"
 import Link from "../design-system/components/Link"
 import FormPageLayout from "../design-system/components/layouts/FormPageLayout"
 import PageContent from "../design-system/components/PageContent"
@@ -126,14 +128,18 @@ function getSuggestedTargets(severity: CaseRecord["severity"]) {
 }
 
 function getShellStatus(status: CaseRecord["status"]): CaseStatus {
+  return status
+}
+
+function getCaseStatusLabel(status: CaseRecord["status"]) {
   switch (status) {
-    case "New":
-      return "new"
-    case "Resolved":
-      return "resolved"
-    case "In progress":
+    case "resolved":
+      return "Resolved"
+    case "new":
+      return "New"
+    case "in_progress":
     default:
-      return "in_progress"
+      return "In progress"
   }
 }
 
@@ -145,14 +151,18 @@ function getDisplayValue(value: string | null | undefined) {
   return value.trim() ? value : "—"
 }
 
-function buildAICaseInput(record: CaseRecord, sections: SectionConfig[]): AICaseInput {
+function buildAICaseInput(
+  record: CaseRecord,
+  sections: SectionConfig[],
+  caseState: CaseState,
+): AICaseInput {
   const excludedTopLevelFieldLabels = new Set(["Status", "Priority"])
 
   return {
     caseId: record.id,
     title: record.title,
     status: record.status,
-    state: record.state,
+    state: caseState,
     priority: record.priority || undefined,
     blockingReason: record.blockingReason || undefined,
     sections: sections.map((section) => ({
@@ -266,7 +276,7 @@ function getCaseIntent(input: Pick<AICaseInput, "status" | "blockingReason">): A
     return "blocked"
   }
 
-  if (input.status === "Resolved") {
+  if (input.status === "resolved") {
     return "resolved"
   }
 
@@ -417,7 +427,7 @@ function extractOperationalConstraint(
   record: CaseRecord,
   timelineItems: ActivityTimelineItem[],
 ): string {
-  if (record.status === "Resolved") {
+  if (record.status === "resolved") {
     return ""
   }
 
@@ -473,10 +483,11 @@ function extractOperationalConstraint(
 
 function buildSituation(
   record: CaseRecord,
-  caseState: CaseState,
   timelineItems: ActivityTimelineItem[],
 ): AIRecordInsight["situation"] {
-  const primaryStateLabel = caseState.trim() || record.status
+  const stateBadge = getCaseListStateBadge(record.primarySignal)
+  const primaryStateLabel =
+    stateBadge?.label ?? getCaseStatusLabel(record.status)
   const ownershipValue = record.assignee.trim() && record.queue.trim()
     ? `${record.assignee} · ${record.queue}`
     : record.queue.trim()
@@ -485,14 +496,14 @@ function buildSituation(
         ? record.assignee
         : "Unassigned"
   const operationalConstraint = extractOperationalConstraint(record, timelineItems)
-  const stateBadge = getCaseListStateBadge(caseState) ?? {
+  const badge = stateBadge ?? {
     label: primaryStateLabel,
     tone: "neutral" as const,
     emphasis: "subtle" as const,
   }
 
   return [{
-    badge: stateBadge,
+    badge,
     ownership: ownershipValue,
     condition: operationalConstraint || undefined,
   }]
@@ -756,7 +767,35 @@ function findLatestOutboundAwaitingCustomerResponse(
 function deriveCaseState(
   record: CaseRecord,
 ): CaseState {
-  return record.state
+  switch (record.primarySignal) {
+    case "escalated":
+      return "Escalated"
+    case "needs_assignment":
+      return "Needs assignment"
+    case "waiting_for_first_response":
+      return "Waiting for first response"
+    case "waiting_on_customer":
+      return "Waiting on customer"
+    default:
+      break
+  }
+
+  if (
+    record.blockingReason === "awaiting_approval" ||
+    record.blockingReason === "awaiting_engineering_fix"
+  ) {
+    return "Waiting for internal review"
+  }
+
+  if (record.statusReason.trim().toLowerCase().includes("ready to resolve")) {
+    return "Ready to resolve"
+  }
+
+  if (record.status === "new") {
+    return "Waiting for first response"
+  }
+
+  return "In investigation"
 }
 
 function buildEscalationTimelineItem(reason: string, note: string): ActivityTimelineItem {
@@ -867,7 +906,7 @@ function buildFakeActions(
     actions.push({ label, referenceId, reason })
   }
 
-  if (evidenceSignal.intent === "resolved" || record.status === "Resolved") {
+  if (evidenceSignal.intent === "resolved" || record.status === "resolved") {
     if (selectedEventContent.includes("close") || selectedEventContent.includes("resolved")) {
       pushAction("Send closure confirmation", actionReferenceId, `Close the loop on ${productAreaLabel}.`)
     }
@@ -1144,7 +1183,7 @@ function getFakeAIRecordInsight(
   }
 
   return {
-    situation: buildSituation(record, caseState, timelineItems),
+    situation: buildSituation(record, timelineItems),
     caseSummary: buildCaseSummary(record, timelineItems),
     signals: buildFakeSignalItems(signals),
     actions: buildFakeActions(record, evidenceSignal, caseState, timelineItems),
@@ -1264,58 +1303,52 @@ function getPriorityDisplay(priority: CaseRecord["priority"]) {
 
 function getCaseListStatusDisplay(status: CaseRecord["status"]) {
   switch (status) {
-    case "Resolved":
+    case "resolved":
       return {
-        label: status,
+        label: getCaseStatusLabel(status),
         className: "text-[color:var(--color-status-resolved)]",
       }
-    case "New":
+    case "new":
       return {
-        label: status,
+        label: getCaseStatusLabel(status),
         className: "text-[color:var(--color-status-new)]",
       }
-    case "In progress":
+    case "in_progress":
     default:
       return {
-        label: status,
+        label: getCaseStatusLabel(status),
         className: "text-[color:var(--color-status-in-progress)]",
       }
   }
 }
 
-function getCaseListStateBadge(state: CaseState) {
-  switch (state) {
-    case "Escalated":
+function getCaseListStateBadge(primarySignal: CasePrimarySignal) {
+  switch (primarySignal) {
+    case "escalated":
       return {
-        label: state,
+        label: "Escalated",
         tone: "danger" as const,
         emphasis: "subtle" as const,
       }
-    case "Waiting on customer":
+    case "waiting_on_customer":
       return {
-        label: state,
+        label: "Waiting on customer",
         tone: "warning" as const,
         emphasis: "subtle" as const,
       }
-    case "Waiting for internal review":
+    case "waiting_for_first_response":
       return {
-        label: state,
-        tone: "warning" as const,
-        emphasis: "subtle" as const,
-      }
-    case "Waiting for first response":
-      return {
-        label: state,
+        label: "Waiting for first response",
         tone: "info" as const,
         emphasis: "subtle" as const,
       }
-    case "Needs assignment":
+    case "needs_assignment":
       return {
-        label: state,
+        label: "Needs assignment",
         tone: "neutral" as const,
         emphasis: "subtle" as const,
       }
-    case "":
+    case null:
     default:
       return null
   }
@@ -1373,11 +1406,57 @@ function formatCaseListUpdated(value: string) {
   }
 }
 
+type CaseSignalFilterId =
+  | "waiting_on_customer"
+  | "escalated"
+  | "needs_assignment"
+  | "waiting_for_first_response"
+
 type CaseSortColumn = "updated" | "priority"
 type CaseSortDirection = "asc" | "desc"
 
+const CASE_SIGNAL_FILTERS: {
+  id: CaseSignalFilterId
+  label: string
+}[] = [
+  {
+    id: "waiting_on_customer",
+    label: "Waiting on customer",
+  },
+  {
+    id: "escalated",
+    label: "Escalated",
+  },
+  {
+    id: "needs_assignment",
+    label: "Needs assignment",
+  },
+]
+
+const CASE_SIGNAL_FILTER_TO_KEY: Record<
+  CaseSignalFilterId,
+  keyof CaseRecord["signals"]
+> = {
+  waiting_on_customer: "waitingOnCustomer",
+  escalated: "escalated",
+  needs_assignment: "needsAssignment",
+  waiting_for_first_response: "waitingForFirstResponse",
+}
+
 const CASES_LIST_GRID_COLUMNS =
   "md:grid-cols-[minmax(0,2.4fr)_minmax(10rem,1.2fr)_minmax(10rem,1fr)_minmax(8rem,0.9fr)_minmax(10rem,1fr)_minmax(9rem,0.9fr)_1.5rem]"
+
+function isCaseUnassigned(record: CaseRecord) {
+  return record.signals.needsAssignment
+}
+
+function matchesCaseSignalFilter(record: CaseRecord, filterId: CaseSignalFilterId) {
+  const signalKey = CASE_SIGNAL_FILTER_TO_KEY[filterId]
+
+  return signalKey === "needsAssignment"
+    ? isCaseUnassigned(record)
+    : record.signals[signalKey]
+}
 
 function getCaseUpdatedSortValue(value: string) {
   const trimmed = value.trim()
@@ -1526,12 +1605,18 @@ function getNextCaseId(cases: CaseRecord[]) {
 }
 
 function buildNewCaseRecord(): CaseRecord {
+  const signals = {
+    ...EMPTY_CASE_SIGNALS,
+    waitingForFirstResponse: true,
+  }
+
   return {
     ...INITIAL_CASE_RECORD,
     id: "",
     title: "Customer cannot update invoice recipient after clinic transfer",
-    status: "New",
-    state: "Waiting for first response",
+    status: "new",
+    signals,
+    primarySignal: getPrimarySignal(signals),
     blockingReason: "",
     priority: "Medium",
     assignee: "Lucia Fernandez",
@@ -1599,6 +1684,7 @@ export function CaseScreenPage() {
   const [draftRecord, setDraftRecord] = useState(EXAMPLE_CASES[0] ?? INITIAL_CASE_RECORD)
   const [caseSearch, setCaseSearch] = useState("")
   const [caseStatusFilter, setCaseStatusFilter] = useState<CaseRecord["status"] | null>(null)
+  const [activeCaseSignalFilters, setActiveCaseSignalFilters] = useState<CaseSignalFilterId[]>([])
   const [caseSort, setCaseSort] = useState<{
     column: CaseSortColumn
     direction: CaseSortDirection
@@ -1700,8 +1786,8 @@ export function CaseScreenPage() {
   ]
   const caseState = deriveCaseState(savedRecord)
   const showEscalateAction =
-    savedRecord.status !== "Resolved" && savedRecord.state !== "Escalated"
-  const aiCaseInput = buildAICaseInput(savedRecord, aiSourceSections)
+    savedRecord.status !== "resolved" && !savedRecord.signals.escalated
+  const aiCaseInput = buildAICaseInput(savedRecord, aiSourceSections, caseState)
   const aiRecordInsight = getFakeAIRecordInsight(
     savedRecord,
     aiCaseInput,
@@ -1727,6 +1813,11 @@ export function CaseScreenPage() {
         ]
       : []),
   ]
+  const hasActiveCaseSignalFilters = activeCaseSignalFilters.length > 0
+  const hasActiveCaseListFilters =
+    activeCaseFilters.length > 0 ||
+    caseStatusFilter !== null ||
+    hasActiveCaseSignalFilters
   const showClearAllCaseFilters =
     activeCaseFilters.length > 0 && caseStatusFilter !== null
   const filteredCases = cases.filter((record) => {
@@ -1740,7 +1831,11 @@ export function CaseScreenPage() {
     const matchesStatus =
       caseStatusFilter === null || record.status === caseStatusFilter
 
-    return matchesSearch && matchesStatus
+    const matchesSignals = activeCaseSignalFilters.every((filterId) =>
+      matchesCaseSignalFilter(record, filterId)
+    )
+
+    return matchesSearch && matchesStatus && matchesSignals
   })
   const sortedCases = [...filteredCases].sort((a, b) => {
     if (caseSort.column === "priority") {
@@ -1751,6 +1846,9 @@ export function CaseScreenPage() {
 
     return caseSort.direction === "desc" ? updatedDiff : -updatedDiff
   })
+  const caseResultsLabel = hasActiveCaseListFilters
+    ? `${sortedCases.length} ${sortedCases.length === 1 ? "result" : "results"}`
+    : `${cases.length} ${cases.length === 1 ? "case" : "cases"}`
 
   useEffect(() => {
     if (recordTab !== "activity" || !pendingTimelineReferenceId) {
@@ -1885,7 +1983,17 @@ export function CaseScreenPage() {
   }
 
   function handleStatusChange(nextStatus: CaseRecord["status"]) {
-    updateDraft("status", nextStatus)
+    setDraftRecord((current) => {
+      const nextSignals =
+        nextStatus === "resolved" ? EMPTY_CASE_SIGNALS : current.signals
+
+      return {
+        ...current,
+        status: nextStatus,
+        signals: nextSignals,
+        primarySignal: getPrimarySignal(nextSignals),
+      }
+    })
   }
 
   function handleChannelChange(nextChannel: CaseRecord["channel"]) {
@@ -1906,6 +2014,14 @@ export function CaseScreenPage() {
         direction: "desc",
       }
     })
+  }
+
+  function handleToggleCaseSignalFilter(filterId: CaseSignalFilterId) {
+    setActiveCaseSignalFilters((current) => (
+      current.includes(filterId)
+        ? current.filter((item) => item !== filterId)
+        : [...current, filterId]
+    ))
   }
 
   function handleBackToCases() {
@@ -1937,7 +2053,7 @@ export function CaseScreenPage() {
   }
 
   function handleEscalateCase(reason: string, note: string) {
-    if (!selectedCaseId || savedRecord.status === "Resolved" || caseState === "Escalated") {
+    if (!selectedCaseId || savedRecord.status === "resolved" || savedRecord.signals.escalated) {
       return
     }
 
@@ -1953,19 +2069,35 @@ export function CaseScreenPage() {
     setCases((currentCases) =>
       currentCases.map((record) => (
         record.id === selectedCaseId
-          ? {
-              ...record,
-              state: "Escalated",
-            }
+          ? (() => {
+              const nextSignals = {
+                ...record.signals,
+                escalated: true,
+              }
+
+              return {
+                ...record,
+                signals: nextSignals,
+                primarySignal: getPrimarySignal(nextSignals),
+              }
+            })()
           : record
       ))
     )
     setDraftRecord((current) => (
       current.id === selectedCaseId
-        ? {
-            ...current,
-            state: "Escalated",
-          }
+        ? (() => {
+            const nextSignals = {
+              ...current.signals,
+              escalated: true,
+            }
+
+            return {
+              ...current,
+              signals: nextSignals,
+              primarySignal: getPrimarySignal(nextSignals),
+            }
+          })()
         : current
     ))
     handleAppendTimelineItem(nextEscalationItem)
@@ -1996,21 +2128,45 @@ export function CaseScreenPage() {
     setCases((currentCases) =>
       currentCases.map((record) => (
         record.id === selectedCaseId
-          ? {
-              ...record,
-              assignee: trimmedAssignee || record.assignee,
-              queue: trimmedTeam || record.queue,
-            }
+          ? (() => {
+              const nextAssignee = trimmedAssignee || record.assignee
+              const nextSignals = {
+                ...record.signals,
+                needsAssignment:
+                  nextAssignee.trim() === "" ||
+                  nextAssignee.trim().toLowerCase() === "unassigned",
+              }
+
+              return {
+                ...record,
+                assignee: nextAssignee,
+                queue: trimmedTeam || record.queue,
+                signals: nextSignals,
+                primarySignal: getPrimarySignal(nextSignals),
+              }
+            })()
           : record
       ))
     )
     setDraftRecord((current) => (
       current.id === selectedCaseId
-        ? {
-            ...current,
-            assignee: trimmedAssignee || current.assignee,
-            queue: trimmedTeam || current.queue,
-          }
+        ? (() => {
+            const nextAssignee = trimmedAssignee || current.assignee
+            const nextSignals = {
+              ...current.signals,
+              needsAssignment:
+                nextAssignee.trim() === "" ||
+                nextAssignee.trim().toLowerCase() === "unassigned",
+            }
+
+            return {
+              ...current,
+              assignee: nextAssignee,
+              queue: trimmedTeam || current.queue,
+              signals: nextSignals,
+              primarySignal: getPrimarySignal(nextSignals),
+            }
+          })()
         : current
     ))
     handleAppendTimelineItem(nextReassignmentItem)
@@ -2091,7 +2247,7 @@ export function CaseScreenPage() {
             </Button>
           }
           compactFilterSpacing={
-            (activeCaseFilters.length > 0 || caseStatusFilter !== null) && filteredCases.length === 0
+            hasActiveCaseListFilters && filteredCases.length === 0
           }
           resultsRegionId="case-list-results"
           overview={
@@ -2116,17 +2272,51 @@ export function CaseScreenPage() {
             </>
           }
           filterControls={
-            <div className="grid gap-[var(--space-3)] md:grid-cols-[minmax(0,2fr)_minmax(12rem,0.8fr)]">
-              <Field label="Search" variant="tight">
-                <Input
-                  size="sm"
-                  value={caseSearch}
-                  onChange={(event) => setCaseSearch(event.target.value)}
-                  placeholder="Search by case, title, customer, or assignee"
-                  aria-controls="case-list-results"
-                  aria-label="Search cases"
-                />
-              </Field>
+            <div className="space-y-[var(--space-3)]">
+              <div className="grid gap-[var(--space-3)] md:grid-cols-[minmax(0,2fr)_minmax(12rem,0.8fr)]">
+                <Field label="Search" variant="tight">
+                  <Input
+                    size="sm"
+                    value={caseSearch}
+                    onChange={(event) => setCaseSearch(event.target.value)}
+                    placeholder="Search by case, title, customer, or assignee"
+                    aria-controls="case-list-results"
+                    aria-label="Search cases"
+                  />
+                </Field>
+              </div>
+
+              <div
+                role="group"
+                aria-label="Filter cases by signal"
+                className="flex flex-wrap items-center gap-[var(--space-2)]"
+              >
+                {CASE_SIGNAL_FILTERS.map((filter) => {
+                  const selected = activeCaseSignalFilters.includes(filter.id)
+
+                  return (
+                    <FilterChip
+                      key={filter.id}
+                      selected={selected}
+                      aria-controls="case-list-results"
+                      onClick={() => handleToggleCaseSignalFilter(filter.id)}
+                    >
+                      {filter.label}
+                    </FilterChip>
+                  )
+                })}
+
+                {hasActiveCaseSignalFilters ? (
+                  <button
+                    type="button"
+                    onClick={() => setActiveCaseSignalFilters([])}
+                    aria-controls="case-list-results"
+                    className="rounded-[var(--radius-sm)] text-[length:var(--text-meta)] leading-[var(--leading-normal)] text-[color:var(--color-text-brand)] transition-[color,text-decoration-color] hover:text-[var(--color-action-brand-hover)] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-focus-ring)]"
+                  >
+                    Clear filters
+                  </button>
+                ) : null}
+              </div>
             </div>
           }
           activeFilters={activeCaseFilters.length > 0 ? (
@@ -2166,6 +2356,7 @@ export function CaseScreenPage() {
                   onClick={() => {
                     setCaseStatusFilter(null)
                     setCaseSearch("")
+                    setActiveCaseSignalFilters([])
                   }}
                   aria-controls="case-list-results"
                   aria-label="Clear all active filters"
@@ -2178,7 +2369,11 @@ export function CaseScreenPage() {
           ) : undefined}
           listContent={
             <>
-              <div aria-hidden="true" className="h-[var(--space-4)] bg-[var(--color-surface)]" />
+              <div className="bg-[var(--color-surface)] px-[var(--space-4)] py-[var(--space-3)]">
+                <p className="text-[length:var(--text-meta)] leading-[var(--leading-normal)] text-[color:var(--color-text-secondary)]">
+                  {caseResultsLabel}
+                </p>
+              </div>
               <div className={`hidden gap-[var(--space-3)] border-y border-[var(--color-border-divider)] bg-[var(--color-surface-structural-muted)] px-[var(--space-4)] py-[var(--space-3)] md:grid ${CASES_LIST_GRID_COLUMNS}`}>
                 {[
                   { label: "Case" },
@@ -2222,7 +2417,7 @@ export function CaseScreenPage() {
                   {sortedCases.map((record) => {
                     const priorityDisplay = getPriorityDisplay(record.priority)
                     const statusDisplay = getCaseListStatusDisplay(record.status)
-                    const stateBadge = getCaseListStateBadge(record.state)
+                    const stateBadge = getCaseListStateBadge(record.primarySignal)
                     const updatedDisplay = formatCaseListUpdated(record.lastUpdate)
 
                     return (
@@ -2302,6 +2497,7 @@ export function CaseScreenPage() {
                         onClick={() => {
                           setCaseStatusFilter(null)
                           setCaseSearch("")
+                          setActiveCaseSignalFilters([])
                         }}
                       >
                         Clear filters

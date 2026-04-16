@@ -1,6 +1,20 @@
 import type { ReadOnlyValueBehavior } from "../../design-system/components/controls/ReadOnlyValue"
 
-export type CaseStatus = "New" | "In progress" | "Resolved"
+export type CaseStatus = "new" | "in_progress" | "resolved"
+
+export type CaseSignals = {
+  waitingOnCustomer: boolean
+  escalated: boolean
+  needsAssignment: boolean
+  waitingForFirstResponse: boolean
+}
+
+export type CasePrimarySignal =
+  | "waiting_on_customer"
+  | "escalated"
+  | "needs_assignment"
+  | "waiting_for_first_response"
+  | null
 
 export type CaseState =
   | ""
@@ -10,12 +24,14 @@ export type CaseState =
   | "Waiting for internal review"
   | "In investigation"
   | "Escalated"
+  | "Ready to resolve"
 
 export type CaseRecord = {
   title: string
   id: string
   status: CaseStatus
-  state: CaseState
+  signals: CaseSignals
+  primarySignal: CasePrimarySignal
   blockingReason:
     | ""
     | "none"
@@ -68,8 +84,12 @@ export type UpdateCaseRecordField = <K extends keyof CaseRecord>(
   value: CaseRecord[K]
 ) => void
 
+export type CaseRecordFieldKey = {
+  [K in keyof CaseRecord]: CaseRecord[K] extends string ? K : never
+}[keyof CaseRecord]
+
 export type FieldConfig = {
-  key: keyof CaseRecord
+  key: CaseRecordFieldKey
   label: string
   type: "text" | "textarea" | "select"
   visibleIn?: SchemaMode[]

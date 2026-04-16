@@ -25,19 +25,18 @@ export default function SummaryCard({
     "px-[var(--space-4)]",
     "py-[var(--space-3)]",
     "text-left",
-    "transition-[border-color,border-width,color]",
+    "transition-[border-color,color,background-color]",
     selected
       ? [
-          "border-[length:var(--border-width-control-focus)]",
           "border-[var(--color-field-border-focus)]",
           "bg-[var(--color-field-bg)]",
+          "shadow-[inset_0_0_0_1px_var(--color-field-border-focus)]",
         ].join(" ")
       : [
           "bg-[var(--color-field-bg)]",
           "hover:border-[var(--color-field-border-hover)]",
           "hover:bg-[var(--color-surface-muted)]",
         ].join(" "),
-    "focus-visible:border-[length:var(--border-width-control-focus)]",
     "focus-visible:border-[var(--color-field-border-focus)]",
     "focus-visible:bg-[var(--color-field-bg)]",
     "focus-visible:outline-none",

@@ -1,11 +1,35 @@
 import type { ActivityTimelineItem } from "../design-system/components/ActivityTimeline"
-import type { CaseRecord } from "../cases/record/types"
+import { getPrimarySignal } from "../cases/record/caseSignals"
+import type { CaseRecord, CaseSignals } from "../cases/record/types"
 
-export const INITIAL_CASE_RECORD: CaseRecord = {
+type MockCaseRecord = CaseRecord & { followUpsSent?: number }
+
+function createCaseSignals(overrides: Partial<CaseSignals> = {}): CaseSignals {
+  return {
+    waitingOnCustomer: false,
+    escalated: false,
+    needsAssignment: false,
+    waitingForFirstResponse: false,
+    ...overrides,
+  }
+}
+
+function buildCaseRecord(record: MockCaseRecord | Omit<MockCaseRecord, "primarySignal">): MockCaseRecord {
+  const { primarySignal: _primarySignal, ...baseRecord } = record as MockCaseRecord
+
+  return {
+    ...baseRecord,
+    primarySignal: getPrimarySignal(baseRecord.signals),
+  }
+}
+
+export const INITIAL_CASE_RECORD: CaseRecord = buildCaseRecord({
   title: "Finance team still cannot access the invoice portal after password resets",
   id: "CASE-10482",
-  status: "In progress",
-  state: "Waiting on customer",
+  status: "in_progress",
+  signals: createCaseSignals({
+    waitingOnCustomer: true,
+  }),
   blockingReason: "awaiting_customer_validation",
   priority: "High",
   assignee: "Lucia Fernandez",
@@ -40,16 +64,16 @@ export const INITIAL_CASE_RECORD: CaseRecord = {
   emailThreadId: "THR-884291",
   callReference: "CALL-2026-04-01-1184",
   chatSessionId: "CHAT-SES-440218",
-}
+})
 
 export const EXAMPLE_CASES: CaseRecord[] = [
   INITIAL_CASE_RECORD,
-  {
+  buildCaseRecord({
     ...INITIAL_CASE_RECORD,
     id: "CASE-10463",
     title: "Duplicate payment confirmations are making some invoices look paid twice",
-    status: "In progress",
-    state: "In investigation",
+    status: "in_progress",
+    signals: createCaseSignals(),
     blockingReason: "none",
     priority: "Critical",
     assignee: "Jonas Weber",
@@ -83,13 +107,13 @@ export const EXAMPLE_CASES: CaseRecord[] = [
     emailThreadId: "",
     callReference: "",
     chatSessionId: "",
-  },
-  {
+  }),
+  buildCaseRecord({
     ...INITIAL_CASE_RECORD,
     id: "CASE-10511",
     title: "Merged clinic invoices stay missing in the portal until the nightly sync completes",
-    status: "In progress",
-    state: "Waiting for internal review",
+    status: "in_progress",
+    signals: createCaseSignals(),
     blockingReason: "awaiting_engineering_fix",
     priority: "High",
     assignee: "Marco Silva",
@@ -124,13 +148,15 @@ export const EXAMPLE_CASES: CaseRecord[] = [
     emailThreadId: "",
     callReference: "",
     chatSessionId: "",
-  },
-  {
+  }),
+  buildCaseRecord({
     ...INITIAL_CASE_RECORD,
     id: "CASE-10504",
     title: "Finance admins can only see a partial invoice list after the tenant migration",
-    status: "In progress",
-    state: "Escalated",
+    status: "in_progress",
+    signals: createCaseSignals({
+      escalated: true,
+    }),
     blockingReason: "none",
     priority: "High",
     assignee: "Amelie Laurent",
@@ -165,13 +191,15 @@ export const EXAMPLE_CASES: CaseRecord[] = [
     emailThreadId: "",
     callReference: "CALL-2026-04-01-1219",
     chatSessionId: "",
-  },
-  {
+  }),
+  buildCaseRecord({
     ...INITIAL_CASE_RECORD,
     id: "CASE-10388",
     title: "Can VAT labels be renamed in invoice exports?",
-    status: "New",
-    state: "Waiting for first response",
+    status: "new",
+    signals: createCaseSignals({
+      waitingForFirstResponse: true,
+    }),
     blockingReason: "",
     priority: "",
     assignee: "Anais Martin",
@@ -206,13 +234,13 @@ export const EXAMPLE_CASES: CaseRecord[] = [
     emailThreadId: "",
     callReference: "",
     chatSessionId: "CHAT-SES-440901",
-  },
-  {
+  }),
+  buildCaseRecord({
     ...INITIAL_CASE_RECORD,
     id: "CASE-10412",
     title: "Finance users lost billing portal access at one clinic",
-    status: "Resolved",
-    state: "",
+    status: "resolved",
+    signals: createCaseSignals(),
     blockingReason: "none",
     priority: "Medium",
     assignee: "Chiara Marino",
@@ -247,13 +275,13 @@ export const EXAMPLE_CASES: CaseRecord[] = [
     emailThreadId: "THR-884140",
     callReference: "",
     chatSessionId: "",
-  },
-  {
+  }),
+  buildCaseRecord({
     ...INITIAL_CASE_RECORD,
     id: "CASE-10516",
     title: "Low-volume clinic adjustments are missing from the daily settlement export",
-    status: "In progress",
-    state: "In investigation",
+    status: "in_progress",
+    signals: createCaseSignals(),
     blockingReason: "none",
     priority: "Low",
     assignee: "Nadia Romero",
@@ -288,13 +316,16 @@ export const EXAMPLE_CASES: CaseRecord[] = [
     emailThreadId: "THR-884514",
     callReference: "",
     chatSessionId: "",
-  },
-  {
+  }),
+  buildCaseRecord({
     ...INITIAL_CASE_RECORD,
     id: "CASE-10518",
     title: "Can overdue invoice reminders be delayed by two business days?",
-    status: "New",
-    state: "Needs assignment",
+    status: "new",
+    signals: createCaseSignals({
+      needsAssignment: true,
+      waitingForFirstResponse: true,
+    }),
     blockingReason: "",
     priority: "Medium",
     assignee: "",
@@ -329,13 +360,15 @@ export const EXAMPLE_CASES: CaseRecord[] = [
     emailThreadId: "",
     callReference: "",
     chatSessionId: "CHAT-SES-441102",
-  },
-  {
+  }),
+  buildCaseRecord({
     ...INITIAL_CASE_RECORD,
     id: "CASE-10519",
     title: "Customer still needs to confirm corrected statement branding across all clinics",
-    status: "In progress",
-    state: "Waiting on customer",
+    status: "in_progress",
+    signals: createCaseSignals({
+      waitingOnCustomer: true,
+    }),
     blockingReason: "awaiting_customer_reply",
     priority: "Medium",
     assignee: "Lucia Fernandez",
@@ -370,13 +403,15 @@ export const EXAMPLE_CASES: CaseRecord[] = [
     emailThreadId: "THR-884602",
     callReference: "",
     chatSessionId: "",
-  },
-  {
+  }),
+  buildCaseRecord({
     ...INITIAL_CASE_RECORD,
     id: "CASE-10521",
     title: "Cross-border invoice bundle is calculating with the wrong tax rule",
-    status: "In progress",
-    state: "Escalated",
+    status: "in_progress",
+    signals: createCaseSignals({
+      escalated: true,
+    }),
     blockingReason: "awaiting_approval",
     priority: "Critical",
     assignee: "Amelie Laurent",
@@ -411,13 +446,59 @@ export const EXAMPLE_CASES: CaseRecord[] = [
     emailThreadId: "",
     callReference: "CALL-2026-04-11-0907",
     chatSessionId: "",
-  },
-  {
+  }),
+  buildCaseRecord({
+    ...INITIAL_CASE_RECORD,
+    id: "CASE-10536",
+    title: "Escalated invoice correction is paused until the customer confirms the legal entity split",
+    status: "in_progress",
+    signals: createCaseSignals({
+      escalated: true,
+      waitingOnCustomer: true,
+    }),
+    blockingReason: "awaiting_customer_validation",
+    priority: "High",
+    assignee: "Amelie Laurent",
+    queue: "Platform Escalations",
+    statusReason: "Escalated case is waiting on customer validation before the corrective invoice split can be released.",
+    onHoldUntil: "2026-04-13",
+    channel: "Phone",
+    severity: "Major",
+    productArea: "Invoice Split Logic",
+    category: "Billing correction / Legal entity validation",
+    region: "Central Europe",
+    source: "Executive escalation hotline",
+    timelinePolicy: "Enterprise Plus - Executive Escalation",
+    responseTarget: "2026-04-12 10:00 CET",
+    resolutionTarget: "2026-04-13 17:00 CET",
+    firstResponse: "2026-04-12 09:14 CET",
+    lastUpdate: "2026-04-12 13:42 CET",
+    slaStatus: "At risk",
+    breachRisk: "Medium",
+    customer: "Belvista Health Group",
+    contact: "Klara Hoffmann",
+    email: "klara.hoffmann@belvista.example",
+    accountTier: "Enterprise Plus",
+    contractType: "Enterprise subscription with executive escalation coverage",
+    routingGroup: "Platform Escalations",
+    approvalRequired: "No",
+    approvalReason: "",
+    description:
+      "Leadership escalated an invoice correction issue for merged clinics, but the production change is now paused until the customer confirms the legal entity split that should appear on the corrected bundle.",
+    internalNotes:
+      "Engineering has the patch ready. Do not release it until the customer confirms the final entity mapping for the affected clinics.",
+    emailThreadId: "THR-884671",
+    callReference: "CALL-2026-04-12-1011",
+    chatSessionId: "",
+  }),
+  buildCaseRecord({
     ...INITIAL_CASE_RECORD,
     id: "CASE-10531",
     title: "Approval is still pending for the corrective tax-rule release before billing cutoff",
-    status: "In progress",
-    state: "Escalated",
+    status: "in_progress",
+    signals: createCaseSignals({
+      escalated: true,
+    }),
     blockingReason: "awaiting_approval",
     priority: "Critical",
     assignee: "Amelie Laurent",
@@ -452,13 +533,15 @@ export const EXAMPLE_CASES: CaseRecord[] = [
     emailThreadId: "",
     callReference: "CALL-2026-04-12-0839",
     chatSessionId: "",
-  },
-  {
+  }),
+  buildCaseRecord({
     ...INITIAL_CASE_RECORD,
     id: "CASE-10527",
     title: "Escalated invoice visibility repair is still blocking the daily release window",
-    status: "In progress",
-    state: "Escalated",
+    status: "in_progress",
+    signals: createCaseSignals({
+      escalated: true,
+    }),
     blockingReason: "awaiting_engineering_fix",
     priority: "Critical",
     assignee: "Amelie Laurent",
@@ -493,13 +576,59 @@ export const EXAMPLE_CASES: CaseRecord[] = [
     emailThreadId: "",
     callReference: "CALL-2026-04-12-0844",
     chatSessionId: "",
-  },
-  {
+  }),
+  buildCaseRecord({
+    ...INITIAL_CASE_RECORD,
+    id: "CASE-10537",
+    title: "Escalated remittance export defect is waiting for a named escalation owner",
+    status: "in_progress",
+    signals: createCaseSignals({
+      escalated: true,
+      needsAssignment: true,
+    }),
+    blockingReason: "none",
+    priority: "High",
+    assignee: "",
+    queue: "Platform Escalations",
+    statusReason: "Escalated after release review, but the specialist owner is still not assigned for the next repair step.",
+    onHoldUntil: "",
+    channel: "Email",
+    severity: "Major",
+    productArea: "Remittance Export",
+    category: "Escalation routing / Specialist assignment",
+    region: "North America",
+    source: "Customer Support Mailbox",
+    timelinePolicy: "Enterprise Plus - Standard Incident",
+    responseTarget: "2026-04-12 11:15 CET",
+    resolutionTarget: "2026-04-13 18:00 CET",
+    firstResponse: "2026-04-12 10:46 CET",
+    lastUpdate: "2026-04-12 12:08 CET",
+    slaStatus: "At risk",
+    breachRisk: "Medium",
+    customer: "Northlake Ambulatory Partners",
+    contact: "Sharon Mills",
+    email: "sharon.mills@northlake-ambulatory.example",
+    accountTier: "Enterprise",
+    contractType: "Enterprise subscription",
+    routingGroup: "Platform Escalations",
+    approvalRequired: "No",
+    approvalReason: "",
+    description:
+      "A remittance export defect was escalated after standard triage confirmed a release regression, but the specialist owner has not yet been assigned inside the escalation queue.",
+    internalNotes:
+      "Queue accepted the escalation, but ownership is still open. Assign the repair owner before the next customer update window.",
+    emailThreadId: "THR-884676",
+    callReference: "",
+    chatSessionId: "",
+  }),
+  buildCaseRecord({
     ...INITIAL_CASE_RECORD,
     id: "CASE-10532",
     title: "Customer has not responded after repeated follow-ups on corrected invoice branding",
-    status: "In progress",
-    state: "Waiting on customer",
+    status: "in_progress",
+    signals: createCaseSignals({
+      waitingOnCustomer: true,
+    }),
     blockingReason: "awaiting_customer_reply",
     priority: "Low",
     assignee: "Lucia Fernandez",
@@ -535,13 +664,13 @@ export const EXAMPLE_CASES: CaseRecord[] = [
     callReference: "",
     chatSessionId: "",
     followUpsSent: 2,
-  } as CaseRecord & { followUpsSent: number },
-  {
+  }),
+  buildCaseRecord({
     ...INITIAL_CASE_RECORD,
     id: "CASE-10509",
     title: "Customer needs access to archived remittance files from the prior fiscal quarter",
-    status: "Resolved",
-    state: "",
+    status: "resolved",
+    signals: createCaseSignals(),
     blockingReason: "none",
     priority: "Low",
     assignee: "Chiara Marino",
@@ -576,13 +705,15 @@ export const EXAMPLE_CASES: CaseRecord[] = [
     emailThreadId: "",
     callReference: "",
     chatSessionId: "",
-  },
-  {
+  }),
+  buildCaseRecord({
     ...INITIAL_CASE_RECORD,
     id: "CASE-10524",
     title: "Customer still needs to confirm corrected payer mapping in the remittance export",
-    status: "In progress",
-    state: "Waiting on customer",
+    status: "in_progress",
+    signals: createCaseSignals({
+      waitingOnCustomer: true,
+    }),
     blockingReason: "awaiting_customer_validation",
     priority: "Medium",
     assignee: "Lucia Fernandez",
@@ -617,13 +748,13 @@ export const EXAMPLE_CASES: CaseRecord[] = [
     emailThreadId: "THR-884633",
     callReference: "",
     chatSessionId: "",
-  },
-  {
+  }),
+  buildCaseRecord({
     ...INITIAL_CASE_RECORD,
     id: "CASE-10526",
     title: "Corrected settlement export now includes the missing insurance adjustment codes",
-    status: "In progress",
-    state: "Ready to resolve" as unknown as CaseRecord["state"],
+    status: "in_progress",
+    signals: createCaseSignals(),
     blockingReason: "none",
     priority: "Medium",
     assignee: "Nadia Romero",
@@ -658,7 +789,7 @@ export const EXAMPLE_CASES: CaseRecord[] = [
     emailThreadId: "THR-884647",
     callReference: "",
     chatSessionId: "",
-  },
+  }),
 ]
 
 export const activityTimelineItems: ActivityTimelineItem[] = [
