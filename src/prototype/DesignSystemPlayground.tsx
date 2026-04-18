@@ -151,6 +151,336 @@ function getDisplayValue(value: string | null | undefined) {
   return value.trim() ? value : "—"
 }
 
+function parseCaseListDateTime(value: string) {
+  const trimmed = value.trim()
+
+  if (!trimmed) {
+    return null
+  }
+
+  const [datePart, timePart] = trimmed.split(" ")
+
+  if (!datePart) {
+    return null
+  }
+
+  const normalizedTime =
+    timePart && /^\d{2}:\d{2}$/.test(timePart) ? timePart : "00:00"
+  const parsedDate = new Date(`${datePart}T${normalizedTime}:00`)
+
+  return Number.isNaN(parsedDate.getTime()) ? null : parsedDate
+}
+
+function getCaseAgeLabel(value: string, referenceTime = Date.now()) {
+  const parsedDate = parseCaseListDateTime(value)
+
+  if (!parsedDate) {
+    return null
+  }
+
+  const diffInMilliseconds = referenceTime - parsedDate.getTime()
+
+  if (diffInMilliseconds <= 0) {
+    return "1h"
+  }
+
+  const diffInHours = Math.max(1, Math.floor(diffInMilliseconds / (1000 * 60 * 60)))
+
+  if (diffInHours < 24) {
+    return `${diffInHours}h`
+  }
+
+  return `${Math.floor(diffInHours / 24)}d`
+}
+
+function getCaseListUrgencyReferenceTime(records: CaseRecord[]) {
+  const latestReferenceTime = records.reduce((latest, record) => {
+    const recordTime = getCaseUpdatedSortValue(record.lastUpdate)
+
+    return recordTime > latest ? recordTime : latest
+  }, 0)
+
+  return latestReferenceTime || Date.now()
+}
+
+function isSameCaseListDay(value: string, referenceTime: number) {
+  const firstDate = parseCaseListDateTime(value)
+  const secondDate = new Date(referenceTime)
+
+  if (!firstDate || !secondDate) {
+    return false
+  }
+
+  return (
+    firstDate.getFullYear() === secondDate.getFullYear() &&
+    firstDate.getMonth() === secondDate.getMonth() &&
+    firstDate.getDate() === secondDate.getDate()
+  )
+}
+
+function getFallbackCaseAgeLabel(record: CaseRecord) {
+  if (record.status === "new" || record.signals.waitingForFirstResponse) {
+    return "1h"
+  }
+
+  const numericId = Number.parseInt(record.id.replace(/\D/g, ""), 10)
+
+  if (Number.isNaN(numericId)) {
+    return "1d"
+  }
+
+  return numericId % 2 === 0 ? `${(numericId % 8) + 1}h` : `${(numericId % 6) + 1}d`
+}
+
+function getCaseListRelativeTimeLabel(record: CaseRecord, referenceTime: number) {
+  return getCaseAgeLabel(record.lastUpdate, referenceTime) ?? getFallbackCaseAgeLabel(record)
+}
+
+function getCaseListRelativeAgeHours(record: CaseRecord, referenceTime: number) {
+  const relativeTimeLabel = getCaseListRelativeTimeLabel(record, referenceTime)
+  const numericValue = Number.parseInt(relativeTimeLabel, 10)
+
+  if (Number.isNaN(numericValue)) {
+    return 24
+  }
+
+  return relativeTimeLabel.endsWith("d") ? numericValue * 24 : numericValue
+}
+
+function getCaseListState(record: CaseRecord, referenceTime: number): {
+  baseState: CaseListBaseState
+  narrativeState: string
+} {
+  const ageLabel = getCaseListRelativeTimeLabel(record, referenceTime)
+  const ageSuffix = ` · ${ageLabel}`
+  const hasAssignee = record.assignee.trim().length > 0
+
+  if (record.status === "resolved") {
+    return {
+      baseState: "Resolved",
+      narrativeState: `Resolved${ageSuffix}`,
+    }
+  }
+
+  if (record.signals.needsAssignment) {
+    if (record.signals.escalated) {
+      return {
+        baseState: "Needs assignment",
+        narrativeState: `Escalated · needs assignment${ageSuffix}`,
+      }
+    }
+
+    return {
+      baseState: "Needs assignment",
+      narrativeState: `Needs assignment${ageSuffix}`,
+    }
+  }
+
+  if (record.signals.waitingOnCustomer) {
+    return {
+      baseState: "Waiting on customer",
+      narrativeState: `Waiting on customer${ageSuffix}`,
+    }
+  }
+
+  if (record.signals.escalated) {
+    if (record.blockingReason === "awaiting_approval") {
+      return {
+        baseState: "Waiting on internal",
+        narrativeState: `Escalated · waiting on approval${ageSuffix}`,
+      }
+    }
+
+    return {
+      baseState: hasAssignee ? "In progress" : "Needs assignment",
+      narrativeState: hasAssignee
+        ? `Escalated · in progress${ageSuffix}`
+        : `Escalated · needs assignment${ageSuffix}`,
+    }
+  }
+
+  if (record.signals.waitingForFirstResponse) {
+    return {
+      baseState: hasAssignee ? "In progress" : "Needs assignment",
+      narrativeState: hasAssignee
+        ? `In progress${ageSuffix}`
+        : `Needs assignment${ageSuffix}`,
+    }
+  }
+
+  switch (record.blockingReason) {
+    case "awaiting_approval":
+      return {
+        baseState: "Waiting on internal",
+        narrativeState: `Waiting on internal · approval${ageSuffix}`,
+      }
+    case "awaiting_engineering_fix":
+      return {
+        baseState: "In progress",
+        narrativeState: `In progress · internal fix${ageSuffix}`,
+      }
+    default:
+      break
+  }
+
+  if (hasAssignee) {
+    return {
+      baseState: "In progress",
+      narrativeState: `In progress${ageSuffix}`,
+    }
+  }
+
+  return {
+    baseState: "Needs assignment",
+    narrativeState: `Needs assignment${ageSuffix}`,
+  }
+}
+
+function getCaseUrgencySignal(record: CaseRecord, referenceTime: number) {
+  const { baseState } = getCaseListState(record, referenceTime)
+  const ageHours = getCaseListRelativeAgeHours(record, referenceTime)
+  const ageDays = ageHours / 24
+  const targetIsToday = isSameCaseListDay(record.resolutionTarget, referenceTime)
+
+  if (baseState === "Resolved") {
+    return {
+      label: "",
+      className: "text-[color:var(--color-text-secondary)]",
+      sortValue: getCaseUrgencySortValue(""),
+    }
+  }
+
+  if (baseState === "Needs assignment") {
+    if (record.signals.escalated && ageDays >= 14) {
+      return {
+        label: "Breached",
+        className: "text-[color:var(--color-text-danger)]",
+        sortValue: getCaseUrgencySortValue("Breached"),
+      }
+    }
+
+    return {
+      label: "Needs owner",
+      className: "text-[color:var(--color-text-warning)]",
+      sortValue: getCaseUrgencySortValue("Needs owner"),
+    }
+  }
+
+  if ((record.signals.escalated && ageDays >= 10) || ageDays >= 14) {
+    return {
+      label: "Breached",
+      className: "text-[color:var(--color-text-danger)]",
+      sortValue: getCaseUrgencySortValue("Breached"),
+    }
+  }
+
+  if (baseState === "Waiting on customer") {
+    if (record.signals.escalated || targetIsToday || ageDays >= 10) {
+      return {
+        label: "Today",
+        className: "text-[color:var(--color-text-warning)]",
+        sortValue: getCaseUrgencySortValue("Today"),
+      }
+    }
+
+    return {
+      label: "",
+      className: "text-[color:var(--color-text-secondary)]",
+      sortValue: getCaseUrgencySortValue(""),
+    }
+  }
+
+  if (baseState === "Waiting on internal") {
+    if (record.signals.escalated || ageDays >= 5 || targetIsToday) {
+      return {
+        label: "4h left",
+        className: "text-[color:var(--color-text-warning)]",
+        sortValue: getCaseUrgencySortValue("4h left"),
+      }
+    }
+
+    if (ageDays >= 2) {
+      return {
+        label: "Today",
+        className: "text-[color:var(--color-text-warning)]",
+        sortValue: getCaseUrgencySortValue("Today"),
+      }
+    }
+
+    return {
+      label: "",
+      className: "text-[color:var(--color-text-secondary)]",
+      sortValue: getCaseUrgencySortValue(""),
+    }
+  }
+
+  if (record.signals.escalated || (record.breachRisk === "High" && ageDays >= 8)) {
+    return {
+      label: "2h left",
+      className: "text-[color:var(--color-text-warning)]",
+      sortValue: getCaseUrgencySortValue("2h left"),
+    }
+  }
+
+  if (ageDays >= 7 || (record.breachRisk === "Medium" && ageDays >= 5)) {
+    return {
+      label: "4h left",
+      className: "text-[color:var(--color-text-warning)]",
+      sortValue: getCaseUrgencySortValue("4h left"),
+    }
+  }
+
+  if (ageDays >= 3 || targetIsToday) {
+    return {
+      label: "Today",
+      className: "text-[color:var(--color-text-warning)]",
+      sortValue: getCaseUrgencySortValue("Today"),
+    }
+  }
+
+  return {
+    label: "",
+    className: "text-[color:var(--color-text-secondary)]",
+    sortValue: getCaseUrgencySortValue(""),
+  }
+}
+
+function getCaseOwnershipSignal(record: CaseRecord, currentAssignee: string) {
+  const trimmedAssignee = record.assignee.trim()
+
+  if (!trimmedAssignee) {
+    return {
+      label: "Unassigned",
+      className: "text-[color:var(--color-text-muted)]",
+    }
+  }
+
+  return {
+    label: isCaseAssignedToDemoUser(record, currentAssignee) ? "You" : trimmedAssignee,
+    className: "text-[color:var(--color-text-secondary)]",
+  }
+}
+
+function getCaseUrgencySortValue(label: string) {
+  return CASE_URGENCY_SORT_RANK[label] ?? 0
+}
+
+function getCasePriorityContextLabel(priority: CaseRecord["priority"]) {
+  switch (priority) {
+    case "Critical":
+      return "P1"
+    case "High":
+      return "P2"
+    case "Medium":
+      return "P3"
+    case "Low":
+      return "P4"
+    case "":
+    default:
+      return null
+  }
+}
+
 function buildAICaseInput(
   record: CaseRecord,
   sections: SectionConfig[],
@@ -1270,58 +1600,6 @@ const asideTitleStyles = {
   color: "var(--color-text-primary)",
 } as const
 
-function getPriorityDisplay(priority: CaseRecord["priority"]) {
-  switch (priority) {
-    case "Critical":
-      return {
-        label: "P4 Critical",
-        className: "text-[color:var(--color-text-primary)]",
-      }
-    case "High":
-      return {
-        label: "P3 High",
-        className: "text-[color:var(--color-text-primary)]",
-      }
-    case "Medium":
-      return {
-        label: "P2 Medium",
-        className: "text-[color:var(--color-text-primary)]",
-      }
-    case "Low":
-      return {
-        label: "P1 Low",
-        className: "text-[color:var(--color-text-primary)]",
-      }
-    case "":
-    default:
-      return {
-        label: "P0 Not set",
-        className: "text-[color:var(--color-text-primary)]",
-      }
-  }
-}
-
-function getCaseListStatusDisplay(status: CaseRecord["status"]) {
-  switch (status) {
-    case "resolved":
-      return {
-        label: getCaseStatusLabel(status),
-        className: "text-[color:var(--color-status-resolved)]",
-      }
-    case "new":
-      return {
-        label: getCaseStatusLabel(status),
-        className: "text-[color:var(--color-status-new)]",
-      }
-    case "in_progress":
-    default:
-      return {
-        label: getCaseStatusLabel(status),
-        className: "text-[color:var(--color-status-in-progress)]",
-      }
-  }
-}
-
 function getCaseListStateBadge(primarySignal: CasePrimarySignal) {
   switch (primarySignal) {
     case "escalated":
@@ -1354,58 +1632,6 @@ function getCaseListStateBadge(primarySignal: CasePrimarySignal) {
   }
 }
 
-function formatCaseListUpdated(value: string) {
-  const trimmed = value.trim()
-
-  if (!trimmed) {
-    return {
-      primary: "—",
-      secondary: undefined,
-    }
-  }
-
-  const [datePart, ...timeParts] = trimmed.split(" ")
-
-  if (!datePart) {
-    return {
-      primary: trimmed,
-      secondary: undefined,
-    }
-  }
-
-  const parsedDate = new Date(`${datePart}T00:00:00`)
-
-  if (Number.isNaN(parsedDate.getTime())) {
-    return {
-      primary: trimmed,
-      secondary: undefined,
-    }
-  }
-
-  const today = new Date()
-  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate())
-  const diffInDays = Math.round(
-    (todayStart.getTime() - parsedDate.getTime()) / (1000 * 60 * 60 * 24)
-  )
-
-  const primary =
-    diffInDays === 0
-      ? "Today"
-      : diffInDays === 1
-        ? "Yesterday"
-        : parsedDate.toLocaleDateString("en-US", {
-            month: "short",
-            day: "numeric",
-          })
-
-  const secondary = timeParts.join(" ").trim() || parsedDate.getFullYear().toString()
-
-  return {
-    primary,
-    secondary,
-  }
-}
-
 type CaseSignalFilterId =
   | "waiting_on_customer"
   | "escalated"
@@ -1414,6 +1640,22 @@ type CaseSignalFilterId =
 
 type CaseSortColumn = "updated" | "priority"
 type CaseSortDirection = "asc" | "desc"
+type CaseListBaseState =
+  | "Waiting on customer"
+  | "In progress"
+  | "Waiting on internal"
+  | "Needs assignment"
+  | "Resolved"
+
+const DEMO_CURRENT_ASSIGNEE = "Lucia Fernandez"
+const CASE_URGENCY_SORT_RANK: Record<string, number> = {
+  Breached: 5,
+  "Needs owner": 4,
+  "2h left": 3,
+  "4h left": 2,
+  Today: 1,
+  "": 0,
+}
 
 const CASE_SIGNAL_FILTERS: {
   id: CaseSignalFilterId
@@ -1444,10 +1686,14 @@ const CASE_SIGNAL_FILTER_TO_KEY: Record<
 }
 
 const CASES_LIST_GRID_COLUMNS =
-  "md:grid-cols-[minmax(0,2.4fr)_minmax(10rem,1.2fr)_minmax(10rem,1fr)_minmax(8rem,0.9fr)_minmax(10rem,1fr)_minmax(9rem,0.9fr)_1.5rem]"
+  "md:grid-cols-[minmax(0,2.95fr)_minmax(0,2.05fr)_minmax(6rem,0.72fr)_minmax(8.25rem,0.9fr)_1.5rem]"
 
 function isCaseUnassigned(record: CaseRecord) {
   return record.signals.needsAssignment
+}
+
+function isCaseAssignedToDemoUser(record: CaseRecord, assigneeName: string) {
+  return record.assignee.trim().toLowerCase() === assigneeName.trim().toLowerCase()
 }
 
 function matchesCaseSignalFilter(record: CaseRecord, filterId: CaseSignalFilterId) {
@@ -1482,22 +1728,6 @@ function getCaseUpdatedSortValue(value: string) {
   return parsedDate.getTime()
 }
 
-function getCasePrioritySortValue(priority: CaseRecord["priority"]) {
-  switch (priority) {
-    case "Critical":
-      return 4
-    case "High":
-      return 3
-    case "Medium":
-      return 2
-    case "Low":
-      return 1
-    case "":
-    default:
-      return 0
-  }
-}
-
 function compareCasesByUpdatedDescending(a: CaseRecord, b: CaseRecord) {
   return getCaseUpdatedSortValue(b.lastUpdate) - getCaseUpdatedSortValue(a.lastUpdate)
 }
@@ -1505,10 +1735,12 @@ function compareCasesByUpdatedDescending(a: CaseRecord, b: CaseRecord) {
 function compareCasesByPriority(
   a: CaseRecord,
   b: CaseRecord,
-  direction: CaseSortDirection
+  direction: CaseSortDirection,
+  referenceTime: number
 ) {
   const priorityDiff =
-    getCasePrioritySortValue(a.priority) - getCasePrioritySortValue(b.priority)
+    getCaseUrgencySignal(a, referenceTime).sortValue -
+    getCaseUrgencySignal(b, referenceTime).sortValue
 
   if (priorityDiff !== 0) {
     return direction === "desc" ? -priorityDiff : priorityDiff
@@ -1685,6 +1917,7 @@ export function CaseScreenPage() {
   const [caseSearch, setCaseSearch] = useState("")
   const [caseStatusFilter, setCaseStatusFilter] = useState<CaseRecord["status"] | null>(null)
   const [activeCaseSignalFilters, setActiveCaseSignalFilters] = useState<CaseSignalFilterId[]>([])
+  const [showAssignedToMeOnly, setShowAssignedToMeOnly] = useState(false)
   const [caseSort, setCaseSort] = useState<{
     column: CaseSortColumn
     direction: CaseSortDirection
@@ -1812,14 +2045,22 @@ export function CaseScreenPage() {
           },
         ]
       : []),
+    ...(showAssignedToMeOnly
+      ? [
+          {
+            id: "assigned-to-me" as const,
+            label: "Assigned to me",
+            clear: () => setShowAssignedToMeOnly(false),
+          },
+        ]
+      : []),
   ]
   const hasActiveCaseSignalFilters = activeCaseSignalFilters.length > 0
   const hasActiveCaseListFilters =
     activeCaseFilters.length > 0 ||
     caseStatusFilter !== null ||
     hasActiveCaseSignalFilters
-  const showClearAllCaseFilters =
-    activeCaseFilters.length > 0 && caseStatusFilter !== null
+  const showClearAllCaseFilters = hasActiveCaseListFilters
   const filteredCases = cases.filter((record) => {
     const matchesSearch =
       trimmedCaseSearch === "" ||
@@ -1835,11 +2076,15 @@ export function CaseScreenPage() {
       matchesCaseSignalFilter(record, filterId)
     )
 
-    return matchesSearch && matchesStatus && matchesSignals
+    const matchesAssignedToMe =
+      !showAssignedToMeOnly || isCaseAssignedToDemoUser(record, DEMO_CURRENT_ASSIGNEE)
+
+    return matchesSearch && matchesStatus && matchesSignals && matchesAssignedToMe
   })
+  const caseListUrgencyReferenceTime = getCaseListUrgencyReferenceTime(cases)
   const sortedCases = [...filteredCases].sort((a, b) => {
     if (caseSort.column === "priority") {
-      return compareCasesByPriority(a, b, caseSort.direction)
+      return compareCasesByPriority(a, b, caseSort.direction, caseListUrgencyReferenceTime)
     }
 
     const updatedDiff = compareCasesByUpdatedDescending(a, b)
@@ -2306,10 +2551,21 @@ export function CaseScreenPage() {
                   )
                 })}
 
-                {hasActiveCaseSignalFilters ? (
+                <FilterChip
+                  selected={showAssignedToMeOnly}
+                  aria-controls="case-list-results"
+                  onClick={() => setShowAssignedToMeOnly((current) => !current)}
+                >
+                  Assigned to me
+                </FilterChip>
+
+                {hasActiveCaseSignalFilters || showAssignedToMeOnly ? (
                   <button
                     type="button"
-                    onClick={() => setActiveCaseSignalFilters([])}
+                    onClick={() => {
+                      setActiveCaseSignalFilters([])
+                      setShowAssignedToMeOnly(false)
+                    }}
                     aria-controls="case-list-results"
                     className="rounded-[var(--radius-sm)] text-[length:var(--text-meta)] leading-[var(--leading-normal)] text-[color:var(--color-text-brand)] transition-[color,text-decoration-color] hover:text-[var(--color-action-brand-hover)] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-focus-ring)]"
                   >
@@ -2357,6 +2613,7 @@ export function CaseScreenPage() {
                     setCaseStatusFilter(null)
                     setCaseSearch("")
                     setActiveCaseSignalFilters([])
+                    setShowAssignedToMeOnly(false)
                   }}
                   aria-controls="case-list-results"
                   aria-label="Clear all active filters"
@@ -2375,106 +2632,97 @@ export function CaseScreenPage() {
                 </p>
               </div>
               <div className={`hidden gap-[var(--space-3)] border-y border-[var(--color-border-divider)] bg-[var(--color-surface-structural-muted)] px-[var(--space-4)] py-[var(--space-3)] md:grid ${CASES_LIST_GRID_COLUMNS}`}>
-                {[
-                  { label: "Case" },
-                  { label: "Customer" },
-                  { label: "Status" },
-                  { label: "Priority", sortColumn: "priority" as const },
-                  { label: "Assignee" },
-                  { label: "Updated", sortColumn: "updated" as const },
-                  { label: "" },
-                ].map((item, index) => (
-                  <div
-                    key={`${item.label}-${index}`}
-                    className={`min-w-0 text-[length:var(--text-meta)] leading-[var(--leading-normal)] font-medium text-[color:var(--color-text-secondary)] ${index === 6 ? "text-right" : ""}`}
+                <div className="min-w-0 text-[length:var(--text-meta)] leading-[var(--leading-normal)] font-medium text-[color:var(--color-text-secondary)]">
+                  Case
+                </div>
+                <div className="min-w-0 text-[length:var(--text-meta)] leading-[var(--leading-normal)] font-medium text-[color:var(--color-text-secondary)]">
+                  State
+                </div>
+                <div className="min-w-0 text-[length:var(--text-meta)] leading-[var(--leading-normal)] font-medium text-[color:var(--color-text-secondary)]">
+                  <button
+                    type="button"
+                    onClick={() => handleCaseSort("priority")}
+                    className={`inline-flex w-full min-w-0 appearance-none items-center justify-start gap-[var(--space-1)] border-0 bg-transparent p-0 text-left transition-colors hover:text-[color:var(--color-text-primary)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-focus-ring)] ${
+                      caseSort.column === "priority"
+                        ? "text-[color:var(--color-text-primary)]"
+                        : ""
+                    }`}
+                    aria-label="Sort cases by priority"
                   >
-                    {item.sortColumn ? (
-                      <button
-                        type="button"
-                        onClick={() => handleCaseSort(item.sortColumn)}
-                        className={`inline-flex w-full min-w-0 appearance-none items-center justify-between gap-[var(--space-1)] border-0 bg-transparent p-0 text-left transition-colors hover:text-[color:var(--color-text-primary)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-focus-ring)] ${
-                          caseSort.column === item.sortColumn
-                            ? "text-[color:var(--color-text-primary)]"
-                            : ""
-                        }`}
-                        aria-label={`Sort cases by ${item.label}`}
-                      >
-                        <span className="min-w-0 truncate">{item.label}</span>
-                        <SortIndicator
-                          active={caseSort.column === item.sortColumn}
-                          direction={caseSort.direction}
-                        />
-                      </button>
-                    ) : (
-                      item.label
-                    )}
-                  </div>
-                ))}
+                    <span className="min-w-0 truncate">Urgency</span>
+                    <SortIndicator
+                      active={caseSort.column === "priority"}
+                      direction={caseSort.direction}
+                    />
+                  </button>
+                </div>
+                <div className="min-w-0 text-right text-[length:var(--text-meta)] leading-[var(--leading-normal)] font-medium text-[color:var(--color-text-secondary)] md:col-start-4 md:col-span-2">
+                  Owner
+                </div>
               </div>
 
               {sortedCases.length > 0 ? (
                 <div>
                   {sortedCases.map((record) => {
-                    const priorityDisplay = getPriorityDisplay(record.priority)
-                    const statusDisplay = getCaseListStatusDisplay(record.status)
-                    const stateBadge = getCaseListStateBadge(record.primarySignal)
-                    const updatedDisplay = formatCaseListUpdated(record.lastUpdate)
+                    const stateNarrative = getCaseListState(
+                      record,
+                      caseListUrgencyReferenceTime
+                    ).narrativeState
+                    const [stateNarrativeLead, stateNarrativeSuffix] =
+                      stateNarrative.split(/ · (?=[^·]+$)/)
+                    const urgencySignal = getCaseUrgencySignal(record, caseListUrgencyReferenceTime)
+                    const ownershipSignal = getCaseOwnershipSignal(record, DEMO_CURRENT_ASSIGNEE)
+                    const priorityContextLabel = getCasePriorityContextLabel(record.priority)
 
                     return (
                       <button
                         key={record.id}
                         type="button"
                         onClick={() => openCase(record.id)}
-                        className={`group grid w-full appearance-none cursor-pointer gap-[var(--space-2)] border-x-0 border-b-0 border-t border-[var(--color-border-divider)] bg-[var(--color-surface)] px-[var(--space-4)] py-[var(--space-4)] text-left transition-[background-color,border-color,opacity] duration-100 first:border-t-0 hover:bg-[var(--color-surface-muted)] focus-visible:bg-[var(--color-surface-muted)] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--color-focus-ring)] md:items-center md:gap-[var(--space-3)] ${CASES_LIST_GRID_COLUMNS}`}
+                        className={`group grid w-full appearance-none cursor-pointer gap-[var(--space-2)] border-x-0 border-b-0 border-t border-[var(--color-border-divider)] bg-[var(--color-surface)] px-[var(--space-4)] py-[var(--space-3)] text-left transition-[background-color,border-color,opacity] duration-100 first:border-t-0 hover:bg-[var(--color-surface-muted)] focus-visible:bg-[var(--color-surface-muted)] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--color-focus-ring)] md:grid-rows-[auto_auto_auto] md:gap-x-[var(--space-3)] md:gap-y-[calc(var(--space-half)/2)] ${CASES_LIST_GRID_COLUMNS}`}
                         aria-label={`Open case ${record.id}`}
                       >
-                        <div className="min-w-0 space-y-[var(--space-half)]">
-                          <p className="text-[length:var(--text-meta)] leading-[var(--leading-normal)] text-[color:var(--color-text-secondary)] transition-colors group-hover:text-[color:var(--color-text-primary)] group-focus-visible:text-[color:var(--color-text-primary)]">
-                            <span className="inline-flex flex-wrap items-center gap-[var(--space-2)]">
-                              <span>{record.id}</span>
-                              {stateBadge ? (
-                                <StatusBadge
-                                  tone={stateBadge.tone}
-                                  emphasis={stateBadge.emphasis}
-                                  size="sm"
-                                >
-                                  {stateBadge.label}
-                                </StatusBadge>
-                              ) : null}
-                            </span>
+                        <div className="min-w-0 md:col-start-1 md:row-start-1">
+                          <p className="inline-flex flex-wrap items-center gap-[var(--space-1)] text-[length:var(--text-meta)] leading-[var(--leading-normal)] text-[color:var(--color-text-secondary)] transition-colors group-hover:text-[color:var(--color-text-primary)] group-focus-visible:text-[color:var(--color-text-primary)]">
+                            <span>{record.id}</span>
+                            {priorityContextLabel ? (
+                              <>
+                                <span aria-hidden="true">·</span>
+                                <span>{priorityContextLabel}</span>
+                              </>
+                            ) : null}
                           </p>
-                          <div className="flex min-w-0 items-start gap-[var(--space-2)]">
-                            <p className="min-w-0 text-[length:var(--text-md)] leading-[var(--leading-normal)] font-medium text-[color:var(--color-text-primary)] transition-colors group-hover:text-[color:var(--color-text-brand)] group-focus-visible:text-[color:var(--color-text-brand)]">
-                              {record.title}
-                            </p>
-                          </div>
                         </div>
-                        <div className="min-w-0 text-sm leading-normal text-[color:var(--color-text-primary)] transition-colors group-hover:text-[color:var(--color-text-brand)] group-focus-visible:text-[color:var(--color-text-brand)]">
-                          {getDisplayValue(record.customer)}
-                        </div>
-                        <div className={`text-sm leading-normal ${statusDisplay.className}`}>
-                          {statusDisplay.label}
-                        </div>
-                        <div className={`text-sm leading-normal ${priorityDisplay.className}`}>
-                          {priorityDisplay.label}
-                        </div>
-                        <div className="min-w-0 text-sm leading-normal text-[color:var(--color-text-primary)] transition-colors group-hover:text-[color:var(--color-text-brand)] group-focus-visible:text-[color:var(--color-text-brand)]">
-                          {getDisplayValue(record.assignee)}
-                        </div>
-                        <div className="space-y-[var(--space-half)]">
-                          <p className="text-sm leading-[var(--leading-normal)] text-[color:var(--color-text-secondary)] transition-colors group-hover:text-[color:var(--color-text-primary)] group-focus-visible:text-[color:var(--color-text-primary)]">
-                            {updatedDisplay.primary}
+                        <div className="min-w-0 md:col-start-1 md:row-start-2">
+                          <p className="min-w-0 text-[length:var(--text-md)] leading-[var(--leading-snug)] font-medium text-[color:var(--color-text-primary)] transition-colors group-hover:text-[color:var(--color-text-brand)] group-focus-visible:text-[color:var(--color-text-brand)]">
+                            {record.title}
                           </p>
-                          {updatedDisplay.secondary ? (
-                            <p className="text-[length:var(--text-meta)] leading-[var(--leading-normal)] text-[color:var(--color-text-muted)]">
-                              {updatedDisplay.secondary}
-                            </p>
-                          ) : null}
                         </div>
-                        <div className="hidden text-right md:block">
+                        <div className="min-w-0 md:col-start-1 md:row-start-3">
+                          <p className="min-w-0 text-sm leading-normal text-[color:var(--color-text-secondary)]">
+                            {getDisplayValue(record.customer)}
+                          </p>
+                        </div>
+                        <div className="min-w-0 text-sm leading-normal text-[color:var(--color-text-secondary)] md:col-start-2 md:row-start-2 md:self-start md:pr-[var(--space-3)]">
+                          <p className="min-w-0 text-sm leading-normal font-medium text-[color:var(--color-text-secondary)]">
+                            <span>{stateNarrativeLead}</span>
+                            {stateNarrativeSuffix ? (
+                              <span className="text-[color:var(--color-text-muted)]">{` · ${stateNarrativeSuffix}`}</span>
+                            ) : null}
+                          </p>
+                        </div>
+                        <div className="min-w-0 text-sm leading-[var(--leading-normal)] md:col-start-3 md:row-start-2 md:self-start">
+                          <p className={`text-sm leading-[var(--leading-normal)] font-medium ${urgencySignal.className}`}>
+                            {urgencySignal.label || <span aria-hidden="true">&nbsp;</span>}
+                          </p>
+                        </div>
+                        <div className="min-w-0 text-[length:var(--text-meta)] leading-[var(--leading-normal)] md:col-start-4 md:col-span-2 md:row-start-2 md:flex md:self-start md:items-center md:justify-end md:gap-[var(--space-2)] md:text-right">
+                          <p className={`text-[length:var(--text-meta)] leading-[var(--leading-normal)] ${ownershipSignal.className}`}>
+                            {ownershipSignal.label}
+                          </p>
                           <TableChevronIcon
                             direction="right"
-                            className="text-[color:var(--color-text-muted)] transition-colors group-hover:text-[color:var(--color-text-secondary)] group-focus-visible:text-[color:var(--color-text-secondary)]"
+                            className="hidden text-[color:var(--color-text-muted)] transition-colors group-hover:text-[color:var(--color-text-secondary)] group-focus-visible:text-[color:var(--color-text-secondary)] md:block"
                           />
                         </div>
                       </button>
@@ -2498,6 +2746,7 @@ export function CaseScreenPage() {
                           setCaseStatusFilter(null)
                           setCaseSearch("")
                           setActiveCaseSignalFilters([])
+                          setShowAssignedToMeOnly(false)
                         }}
                       >
                         Clear filters
