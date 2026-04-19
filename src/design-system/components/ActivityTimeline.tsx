@@ -51,6 +51,13 @@ type ActivityTimelineProps = {
   onSendSuggestedAction?: (actionLabel: ActiveSuggestedAction["label"]) => void
   onDismissSuggestedAction?: () => void
   onOpenSuggestedActionComposer?: () => void
+  replyDraftContext?: {
+    customerName?: string
+    situation?: string
+    nextStep?: string
+    reason?: string
+    ownerName?: string
+  }
 }
 
 const DEFAULT_TYPE_LABELS: Record<ActivityTimelineEventType, string> = {
@@ -291,6 +298,7 @@ export default function ActivityTimeline({
   onSendSuggestedAction,
   onDismissSuggestedAction,
   onOpenSuggestedActionComposer,
+  replyDraftContext,
 }: ActivityTimelineProps) {
   const [isComposerOpen, setIsComposerOpen] = useState(false)
   const [composerActivityType, setComposerActivityType] =
@@ -299,6 +307,7 @@ export default function ActivityTimeline({
   const [draftItems, setDraftItems] = useState<ActivityTimelineItem[]>([])
   const [expandedItemIds, setExpandedItemIds] = useState<Record<string, boolean>>({})
   const [replyDraft, setReplyDraft] = useState("")
+  const [replyComposerItemId, setReplyComposerItemId] = useState<string | null>(null)
   const timelineItems = [...items, ...draftItems]
   const visibleAISummaryItemIds = getVisibleAISummaryItemIds(timelineItems)
   const groups = groupActivityTimelineItems(timelineItems)
@@ -330,7 +339,6 @@ export default function ActivityTimeline({
     "leading-[var(--leading-normal)]",
     "text-[color:var(--color-text-secondary)]",
   ].join(" ")
-
   const groupsClasses = ["space-y-[var(--space-stack-md)]"].join(" ")
   const scrollRegionClasses = [
     "min-h-0",
@@ -523,17 +531,15 @@ export default function ActivityTimeline({
   ].join(" ")
 
   function handleOpenComposer() {
+    setComposerActivityType("internal-note")
     setIsComposerOpen(true)
   }
 
-  function buildReplyDraft(item: ActivityTimelineItem, label: ActiveSuggestedAction["label"]) {
-    const customerName = getCustomerFirstName(item)
+  function handleOpenReplyComposer(itemId: string) {
+    const replyTargetItem = timelineItems.find((timelineItem) => timelineItem.id === itemId)
 
-    if (label === "Follow up with customer") {
-      return `Hi ${customerName}, just following up on this. When you have a moment, could you confirm whether you still need help with this request?`
-    }
-
-    return `Hi ${customerName}, thanks for reaching out. We're reviewing this now. When you have a moment, please let us know if you still need help with this request or if anything has changed since your last message.`
+    setReplyComposerItemId(itemId)
+    setReplyDraft(replyTargetItem ? buildAIDraftReply(replyTargetItem) : "")
   }
 
   function getCustomerFirstName(item: ActivityTimelineItem) {
@@ -558,6 +564,132 @@ export default function ActivityTimeline({
     return "there"
   }
 
+  function getCustomerDisplayName(item: ActivityTimelineItem) {
+    if (typeof item.actor === "string" && item.actor.trim()) {
+      return item.actor.trim()
+    }
+
+    if (typeof replyDraftContext?.customerName === "string" && replyDraftContext.customerName.trim()) {
+      return replyDraftContext.customerName.trim()
+    }
+
+    return "customer"
+  }
+
+  function getOwnerSignOffName() {
+    if (typeof replyDraftContext?.ownerName === "string" && replyDraftContext.ownerName.trim()) {
+      return replyDraftContext.ownerName.trim().split(" ")[0]
+    }
+
+    return "Support"
+  }
+
+  function getItemTextContent(item: ActivityTimelineItem) {
+    return typeof item.content === "string" ? item.content.trim() : ""
+  }
+
+  function getLatestCustomerQuestion(item: ActivityTimelineItem) {
+    const currentItemContent = getItemTextContent(item)
+
+    if (currentItemContent) {
+      return currentItemContent
+    }
+
+    const itemIndex = timelineItems.findIndex((timelineItem) => timelineItem.id === item.id)
+
+    if (itemIndex <= 0) {
+      return ""
+    }
+
+    for (let index = itemIndex - 1; index >= 0; index -= 1) {
+      const candidate = timelineItems[index]
+
+      if (candidate.type === "incoming") {
+        const candidateContent = getItemTextContent(candidate)
+
+        if (candidateContent) {
+          return candidateContent
+        }
+      }
+    }
+
+    return ""
+  }
+
+  function getCustomerPromptLine(message: string) {
+    if (!message) {
+      return ""
+    }
+
+    if (message.length <= 140) {
+      return `You asked: "${message}"`
+    }
+
+    return `You asked for an update on ${message.slice(0, 137).trimEnd()}...`
+  }
+
+  function buildAIDraftReply(item: ActivityTimelineItem) {
+    const customerFirstName = getCustomerFirstName(item)
+    const ownerSignOffName = getOwnerSignOffName()
+    const nextStep = replyDraftContext?.nextStep?.trim().toLowerCase() ?? ""
+    const situation = replyDraftContext?.situation?.trim().toLowerCase() ?? ""
+    const reason = replyDraftContext?.reason?.trim() ?? ""
+    const latestCustomerQuestion = getLatestCustomerQuestion(item)
+    const customerPromptLine = getCustomerPromptLine(latestCustomerQuestion)
+    const shouldRequestConfirmation =
+      situation === "waiting on customer" ||
+      nextStep.includes("confirmation")
+    const shouldSendClosureSummary =
+      nextStep.includes("closure summary") ||
+      nextStep.includes("close the case")
+    const shouldProvideStatusUpdate =
+      nextStep.includes("update") ||
+      nextStep.includes("investigation") ||
+      nextStep.includes("review")
+
+    if (shouldSendClosureSummary) {
+      return `Hi ${customerFirstName},
+
+Thanks for the confirmation. ${customerPromptLine || "I wanted to close the loop on this case."}
+
+The correction is complete on our side, and no additional issue is currently open. If anything still looks off after you review the latest update, please let me know. Otherwise, we can close the case from here.
+
+Best,
+${ownerSignOffName}`
+    }
+
+    if (shouldRequestConfirmation) {
+      return `Hi ${customerFirstName},
+
+Thanks for your message. ${customerPromptLine || "Following up on the update we shared."}
+
+At this point we are waiting for your confirmation so we can move the case forward. When you have a moment, please let us know whether everything now looks correct on your side or if there is still one detail you want us to review.
+
+Best,
+${ownerSignOffName}`
+    }
+
+    if (shouldProvideStatusUpdate) {
+      return `Hi ${customerFirstName},
+
+Thanks for checking in. ${customerPromptLine || "I wanted to share the current status of the case."}
+
+We are still working through the current review on our side and the next step is ${replyDraftContext?.nextStep?.trim() || "to complete the active investigation"}. ${reason ? `At the moment, ${reason.charAt(0).toLowerCase()}${reason.slice(1)}` : "I will send another update as soon as there is a confirmed change to share."}
+
+Best,
+${ownerSignOffName}`
+    }
+
+    return `Hi ${customerFirstName},
+
+Thanks for your message. ${customerPromptLine || "I’m reviewing the latest case activity now."}
+
+The next step on our side is ${replyDraftContext?.nextStep?.trim() || "to continue moving the case forward"}. If there is anything else you want us to take into account, feel free to reply here and I will include it in the review.
+
+Best,
+${ownerSignOffName}`
+  }
+
   useEffect(() => {
     if (!activeSuggestedAction || !activeSuggestedAction.composerOpen) {
       setReplyDraft("")
@@ -573,7 +705,7 @@ export default function ActivityTimeline({
       return
     }
 
-    setReplyDraft(buildReplyDraft(replyTargetItem, activeSuggestedAction.label))
+    setReplyDraft(buildAIDraftReply(replyTargetItem))
   }, [
     activeSuggestedAction?.composerOpen,
     activeSuggestedAction?.label,
@@ -636,6 +768,7 @@ export default function ActivityTimeline({
 
   function handleDiscardReply() {
     setReplyDraft("")
+    setReplyComposerItemId(null)
     onDismissSuggestedAction?.()
   }
 
@@ -672,12 +805,34 @@ export default function ActivityTimeline({
       onSendSuggestedAction?.(activeSuggestedAction.label)
     }
     setReplyDraft("")
+    setReplyComposerItemId(null)
     onDismissSuggestedAction?.()
   }
 
   return (
     <div className={rootClasses}>
-      <section className={composerClasses} aria-label={`${ariaLabel}: add action`}>
+      <style>
+        {`
+          @keyframes activity-timeline-sent-highlight {
+            from {
+              background-color: transparent;
+            }
+
+            12% {
+              background-color: var(--color-surface-feedback);
+            }
+
+            76% {
+              background-color: var(--color-surface-feedback);
+            }
+
+            to {
+              background-color: transparent;
+            }
+          }
+        `}
+      </style>
+      <section className={composerClasses} aria-label={`${ariaLabel}: add internal note`}>
         {isComposerOpen ? (
           <div className="space-y-[var(--space-3)]">
             <div className="space-y-[var(--space-1)]">
@@ -731,9 +886,9 @@ export default function ActivityTimeline({
           </div>
         ) : (
           <div className="flex flex-wrap items-center justify-between gap-[var(--space-3)]">
-            <p className={composerMetaClasses}>Add a new entry to the timeline.</p>
+            <p className={composerMetaClasses}>Add an internal note to the timeline.</p>
             <Button type="button" variant="secondary" size="sm" onClick={handleOpenComposer}>
-              Add action
+              Add internal note
             </Button>
           </div>
         )}
@@ -778,25 +933,30 @@ export default function ActivityTimeline({
                       item.subtype === "Internal note"
                     const hasAISummary = visibleAISummaryItemIds.has(item.id)
                     const showReplyComposer =
-                      activeSuggestedAction?.referenceId === item.id &&
-                      activeSuggestedAction.composerOpen
+                      (activeSuggestedAction?.referenceId === item.id &&
+                        activeSuggestedAction.composerOpen) ||
+                      replyComposerItemId === item.id
                     const showFollowUpActionBar =
                       activeSuggestedAction?.label === "Follow up with customer" &&
                       activeSuggestedAction.referenceId === item.id &&
                       !activeSuggestedAction.composerOpen
+                    const showReplyAction =
+                      item.type === "incoming" && !showReplyComposer && !showFollowUpActionBar
+                    const isFreshSentReply =
+                      highlightedItemId === item.id && item.type === "outgoing"
 
                     return (
                       <li
                         key={item.id}
                         id={item.id}
-                        className={[
-                          itemClasses,
-                          highlightedItemId === item.id
-                            ? "rounded-[var(--radius-sm)] bg-[var(--color-surface-muted)] outline outline-1 -outline-offset-1 outline-[var(--color-border-strong)]"
-                            : "",
-                        ]
-                          .filter(Boolean)
-                          .join(" ")}
+                        className={itemClasses}
+                        style={
+                          isFreshSentReply
+                            ? {
+                                animation: "activity-timeline-sent-highlight 1150ms ease-out",
+                              }
+                            : undefined
+                        }
                       >
                         <div className={identityRowClasses}>
                           <span
@@ -885,7 +1045,7 @@ export default function ActivityTimeline({
                               </p>
                             </div>
                           ) : null}
-                          {isLongContent || isDeletableInternalNote ? (
+                          {isLongContent || isDeletableInternalNote || showReplyAction ? (
                             <div className={actionAreaClasses}>
                               {isLongContent ? (
                                 <button
@@ -904,6 +1064,16 @@ export default function ActivityTimeline({
                                   onClick={() => handleDeleteItem(item.id)}
                                 >
                                   Delete
+                                </button>
+                              ) : null}
+
+                              {showReplyAction ? (
+                                <button
+                                  type="button"
+                                  className={actionButtonClasses}
+                                  onClick={() => handleOpenReplyComposer(item.id)}
+                                >
+                                  Reply
                                 </button>
                               ) : null}
                             </div>
@@ -941,14 +1111,10 @@ export default function ActivityTimeline({
                             <div className={inlineReplyClasses}>
                               <div className="space-y-[var(--space-1)]">
                                 <div className={inlineReplyTitleClasses}>
-                                  {activeSuggestedAction?.label === "Follow up with customer"
-                                    ? "Follow-up draft"
-                                    : "Reply draft"}
+                                  {`Reply to ${getCustomerDisplayName(item)}`}
                                 </div>
                                 <p className={inlineReplyMetaClasses}>
-                                  {activeSuggestedAction?.label === "Follow up with customer"
-                                    ? activeSuggestedAction.reason ?? "Waiting for customer confirmation"
-                                    : "Review and send from the customer message context."}
+                                  Draft reply based on recent case activity and the current next step.
                                 </p>
                               </div>
 
@@ -962,6 +1128,18 @@ export default function ActivityTimeline({
                                     : "Reply to customer"
                                 }
                               />
+
+                              <div>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="w-fit"
+                                  onClick={() => setReplyDraft(buildAIDraftReply(item))}
+                                >
+                                  Rewrite
+                                </Button>
+                              </div>
 
                               <div className="flex flex-wrap items-center gap-[var(--space-2)]">
                                 <Button
@@ -979,7 +1157,7 @@ export default function ActivityTimeline({
                                   size="sm"
                                   onClick={handleDiscardReply}
                                 >
-                                  Discard
+                                  Cancel
                                 </Button>
                               </div>
                             </div>

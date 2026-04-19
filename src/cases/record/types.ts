@@ -26,12 +26,38 @@ export type CaseState =
   | "Escalated"
   | "Ready to resolve"
 
+export type CaseSituation =
+  | ""
+  | "New"
+  | "Needs owner"
+  | "In progress"
+  | "Waiting on customer"
+  | "Waiting on internal team"
+  | "Escalated"
+  | "Ready to close"
+  | "Closed"
+
+export type CaseUrgency =
+  | ""
+  | "Breached"
+  | "2h left"
+  | "Today"
+  | "This week"
+  | "Low"
+  | "No action needed"
+
 export type CaseRecord = {
   title: string
   id: string
   status: CaseStatus
   signals: CaseSignals
   primarySignal: CasePrimarySignal
+  situation: CaseSituation
+  urgency: CaseUrgency
+  owner: string
+  nextStep: string
+  checkpoint: string
+  reason: string
   blockingReason:
     | ""
     | "none"

@@ -2295,6 +2295,58 @@ export function CaseScreenPage() {
       ...current,
       [selectedCaseId]: [...(current[selectedCaseId] ?? []), item],
     }))
+
+    if (item.type !== "outgoing") {
+      return
+    }
+
+    setPendingTimelineReferenceId(item.id)
+
+    const nextLastUpdate =
+      typeof item.timestamp === "string" && item.timestamp.trim()
+        ? item.timestamp
+        : new Date().toLocaleString("en-US", {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+            hour: "numeric",
+            minute: "2-digit",
+          })
+
+    const updateRecordAfterReply = (record: CaseRecord) => {
+      const nextSignals = {
+        ...record.signals,
+        waitingOnCustomer: true,
+        escalated: false,
+        needsAssignment: false,
+        waitingForFirstResponse: false,
+      }
+
+      return {
+        ...record,
+        situation: "Waiting on customer" as const,
+        nextStep: "Wait for customer confirmation",
+        reason: "Awaiting customer confirmation after the latest reply.",
+        statusReason: "Waiting on customer confirmation after the latest reply.",
+        blockingReason: "awaiting_customer_reply" as const,
+        signals: nextSignals,
+        primarySignal: getPrimarySignal(nextSignals),
+        lastUpdate: nextLastUpdate,
+      }
+    }
+
+    setCases((currentCases) =>
+      currentCases.map((record) => (
+        record.id === selectedCaseId
+          ? updateRecordAfterReply(record)
+          : record
+      ))
+    )
+    setDraftRecord((current) => (
+      current.id === selectedCaseId
+        ? updateRecordAfterReply(current)
+        : current
+    ))
   }
 
   function handleEscalateCase(reason: string, note: string) {
@@ -2787,20 +2839,17 @@ export function CaseScreenPage() {
                 : current,
             )
           }
+          onActivateSuggestedAction={(action) => {
+            setPendingTimelineReferenceId(action.referenceId)
+            setActiveSuggestedAction(action)
+          }}
           isAIDrawerOpen={isAIDrawerOpen}
           onToggleAIDrawer={() => setIsAIDrawerOpen((current) => !current)}
           onCloseAIDrawer={() => setIsAIDrawerOpen(false)}
           aiUpdatedLabel={aiUpdatedLabel}
           aiRecordInsight={aiRecordInsight}
           onRefreshAIInsights={refreshAIInsights}
-          onSendSuggestedAction={(actionLabel) => {
-            if (actionLabel === "Reply to customer") {
-              setToastMessage("Reply sent to customer")
-              return
-            }
-
-            setToastMessage("Follow-up sent to customer")
-          }}
+          onSendSuggestedAction={() => {}}
         />
       ) : (
         <>

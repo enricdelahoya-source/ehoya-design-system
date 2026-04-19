@@ -6,18 +6,6 @@ import type {
   SectionConfig,
 } from "./types"
 
-function shouldShowStatusReason(record: CaseRecord) {
-  return record.status === "resolved" || record.statusReason.trim().length > 0
-}
-
-function shouldShowBlockingReason(record: CaseRecord) {
-  return record.blockingReason !== "" && record.blockingReason !== "none"
-}
-
-function shouldShowOnHoldUntil(record: CaseRecord) {
-  return record.onHoldUntil.trim().length > 0
-}
-
 function getChannelReferenceLabel(channel: CaseRecord["channel"]) {
   switch (channel) {
     case "Phone":
@@ -38,21 +26,16 @@ export const STATUS_OPTIONS: FieldOption[] = [
   { value: "resolved", label: "Resolved" },
 ]
 
-const PRIORITY_OPTIONS: FieldOption[] = [
-  { value: "", label: "Select priority" },
-  { value: "Low", label: "Low" },
-  { value: "Medium", label: "Medium" },
-  { value: "High", label: "High" },
-  { value: "Critical", label: "Critical" },
-]
-
-const BLOCKING_REASON_OPTIONS: FieldOption[] = [
-  { value: "", label: "Select blocking reason" },
-  { value: "none", label: "No blocking reason" },
-  { value: "awaiting_customer_reply", label: "Awaiting customer reply" },
-  { value: "awaiting_customer_validation", label: "Awaiting customer validation" },
-  { value: "awaiting_approval", label: "Awaiting approval" },
-  { value: "awaiting_engineering_fix", label: "Awaiting engineering fix" },
+const SITUATION_OPTIONS: FieldOption[] = [
+  { value: "", label: "Select situation" },
+  { value: "New", label: "New" },
+  { value: "Needs owner", label: "Needs owner" },
+  { value: "In progress", label: "In progress" },
+  { value: "Waiting on customer", label: "Waiting on customer" },
+  { value: "Waiting on internal team", label: "Waiting on internal team" },
+  { value: "Escalated", label: "Escalated" },
+  { value: "Ready to close", label: "Ready to close" },
+  { value: "Closed", label: "Closed" },
 ]
 
 const CHANNEL_OPTIONS: FieldOption[] = [
@@ -76,71 +59,53 @@ const REGION_OPTIONS: FieldOption[] = [
 ]
 
 function getStatusOwnershipSectionConfig(
-  visiblePriorityError?: string,
-  markPriorityTouched?: () => void,
-  onStatusChange?: (value: CaseRecord["status"]) => void,
-  onFieldChange?: CaseRecordSectionOptions["onFieldChange"]
+  _visiblePriorityError?: string,
+  _markPriorityTouched?: () => void,
+  _onStatusChange?: (value: CaseRecord["status"]) => void,
+  _onFieldChange?: CaseRecordSectionOptions["onFieldChange"]
 ): SectionConfig {
   return {
     id: "status-ownership",
-    title: "Status & ownership",
-    description: "Current operational state, ownership, and hold information for the case.",
+    title: "Case state",
+    description: "Canonical operational state used to explain why the case is prioritized this way and what should happen next.",
     fields: [
       {
-        key: "status",
-        label: "Status",
+        key: "situation",
+        label: "Situation",
         type: "select",
-        options: STATUS_OPTIONS,
-        onChange: onStatusChange
-          ? (value) => onStatusChange(value as CaseRecord["status"])
-          : undefined,
+        options: SITUATION_OPTIONS,
       },
       {
-        key: "priority",
-        label: "Priority",
-        type: "select",
-        options: PRIORITY_OPTIONS,
-        required: true,
-        error: visiblePriorityError,
-        onBlur: markPriorityTouched,
-        onChange: onFieldChange
-          ? (value) => onFieldChange("priority", value as CaseRecord["priority"])
-          : undefined,
-      },
-      {
-        key: "assignee",
-        label: "Assignee",
+        key: "urgency",
+        label: "Urgency",
         type: "text",
+        displayBehavior: "flexible",
       },
       {
-        key: "queue",
-        label: "Queue",
+        key: "owner",
+        label: "Owner",
+        type: "text",
+        displayBehavior: "flexible",
+      },
+      {
+        key: "nextStep",
+        label: "Next step",
         type: "text",
         span: 2,
         displayBehavior: "flexible",
       },
       {
-        key: "blockingReason",
-        label: "Blocking reason",
-        type: "select",
-        options: BLOCKING_REASON_OPTIONS,
-        when: (currentRecord) => shouldShowBlockingReason(currentRecord),
-        span: 2,
-      },
-      {
-        key: "statusReason",
-        label: "Status reason",
+        key: "checkpoint",
+        label: "Checkpoint",
         type: "text",
-        when: (currentRecord) => shouldShowStatusReason(currentRecord),
-        span: 2,
         displayBehavior: "flexible",
       },
       {
-        key: "onHoldUntil",
-        label: "On hold until",
+        key: "reason",
+        label: "Reason",
         type: "text",
-        when: (currentRecord) => shouldShowOnHoldUntil(currentRecord),
-        inputType: "date",
+        span: 2,
+        displayBehavior: "flexible",
       },
     ],
   }
@@ -256,7 +221,7 @@ function getSlaTimingSectionConfig(
   return {
     id: "sla-timing",
     title: "SLA & timing",
-    description: "Service levels, timestamps, and timing risk indicators.",
+    description: "Secondary service levels, timestamps, and timing indicators that support the operational case state.",
     fields: [
       {
         key: "timelinePolicy",
@@ -365,8 +330,27 @@ function getCaseHandlingSectionConfig(): SectionConfig {
   return {
     id: "case-handling",
     title: "Case handling",
-    description: "Operational settings that affect routing and approval handling.",
+    description: "Secondary lifecycle, assignment, and routing metadata for the case.",
     fields: [
+      {
+        key: "status",
+        label: "Lifecycle status",
+        type: "select",
+        options: STATUS_OPTIONS,
+      },
+      {
+        key: "assignee",
+        label: "System assignee",
+        type: "text",
+        displayBehavior: "flexible",
+      },
+      {
+        key: "queue",
+        label: "Assigned queue",
+        type: "text",
+        span: 2,
+        displayBehavior: "flexible",
+      },
       {
         key: "routingGroup",
         label: "Routing group",

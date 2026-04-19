@@ -3,6 +3,25 @@ import { getPrimarySignal } from "../cases/record/caseSignals"
 import type { CaseRecord, CaseSignals } from "../cases/record/types"
 
 type MockCaseRecord = CaseRecord & { followUpsSent?: number }
+type MockCaseRecordBase = Omit<
+  MockCaseRecord,
+  "primarySignal" | "situation" | "urgency" | "owner" | "nextStep" | "checkpoint" | "reason"
+>
+
+const MONTH_LABELS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+] as const
 
 function createCaseSignals(overrides: Partial<CaseSignals> = {}): CaseSignals {
   return {
@@ -15,21 +34,326 @@ function createCaseSignals(overrides: Partial<CaseSignals> = {}): CaseSignals {
 }
 
 function buildCaseRecord(record: MockCaseRecord | Omit<MockCaseRecord, "primarySignal">): MockCaseRecord {
-  const { primarySignal: _primarySignal, ...baseRecord } = record as MockCaseRecord
+  const {
+    primarySignal: _primarySignal,
+    situation,
+    urgency,
+    owner,
+    nextStep,
+    checkpoint,
+    reason,
+    ...baseRecord
+  } = record as MockCaseRecord
+  const derivedSituation: CaseRecord["situation"] = situation.trim()
+    ? situation
+    : deriveSituation(baseRecord)
+  const derivedOwner = owner.trim() ? owner : deriveOwner(baseRecord)
+  const derivedNextStep = nextStep.trim()
+    ? nextStep
+    : deriveNextStep(baseRecord, derivedSituation)
+  const derivedCheckpoint = checkpoint.trim()
+    ? checkpoint
+    : deriveCheckpoint(baseRecord, derivedSituation)
+  const derivedUrgency: CaseRecord["urgency"] = urgency.trim()
+    ? urgency
+    : deriveUrgency(baseRecord, derivedSituation, derivedCheckpoint)
+  const derivedReason = reason.trim() ? reason : deriveReason(baseRecord, derivedSituation)
 
   return {
     ...baseRecord,
     primarySignal: getPrimarySignal(baseRecord.signals),
+    situation: derivedSituation,
+    urgency: derivedUrgency,
+    owner: derivedOwner,
+    nextStep: derivedNextStep,
+    checkpoint: derivedCheckpoint,
+    reason: derivedReason,
   }
 }
 
-export const INITIAL_CASE_RECORD: CaseRecord = buildCaseRecord({
+function formatDateLabel(value: string) {
+  const match = value.trim().match(/^(\d{4})-(\d{2})-(\d{2})$/)
+
+  if (!match) {
+    return value
+  }
+
+  const [, year, month, day] = match
+  const monthIndex = Number.parseInt(month, 10) - 1
+  const dayOfMonth = Number.parseInt(day, 10)
+
+  if (monthIndex < 0 || monthIndex >= MONTH_LABELS.length || Number.isNaN(dayOfMonth)) {
+    return value
+  }
+
+  return `${MONTH_LABELS[monthIndex]} ${dayOfMonth}, ${year}`
+}
+
+function deriveSituation(
+  record: MockCaseRecordBase
+): NonNullable<CaseRecord["situation"]> {
+  const normalizedStatusReason = record.statusReason.trim().toLowerCase()
+
+  if (record.status === "resolved") {
+    return "Closed"
+  }
+
+  if (record.signals.escalated) {
+    return "Escalated"
+  }
+
+  if (
+    record.signals.waitingOnCustomer ||
+    record.blockingReason === "awaiting_customer_reply" ||
+    record.blockingReason === "awaiting_customer_validation"
+  ) {
+    return "Waiting on customer"
+  }
+
+  if (
+    record.blockingReason === "awaiting_approval" ||
+    record.blockingReason === "awaiting_engineering_fix"
+  ) {
+    return "Waiting on internal team"
+  }
+
+  if (normalizedStatusReason.includes("ready to resolve")) {
+    return "Ready to close"
+  }
+
+  if (record.signals.needsAssignment) {
+    return "Needs owner"
+  }
+
+  if (record.signals.waitingForFirstResponse || record.status === "new") {
+    return "New"
+  }
+
+  return "In progress"
+}
+
+function deriveUrgency(
+  record: MockCaseRecordBase,
+  situation: NonNullable<CaseRecord["situation"]>,
+  checkpoint: string
+): NonNullable<CaseRecord["urgency"]> {
+  const checkpointMoment = getCheckpointMoment(checkpoint)
+
+  if (record.slaStatus === "Breached") {
+    return "Breached"
+  }
+
+  if (record.status === "resolved") {
+    return "Low"
+  }
+
+  if (situation === "Waiting on customer" || situation === "Waiting on internal team") {
+    if (record.onHoldUntil.trim() && checkpointMoment) {
+      return `On hold until ${checkpointMoment}` as CaseRecord["urgency"]
+    }
+
+    if (checkpointMoment) {
+      return `Review on ${checkpointMoment}` as CaseRecord["urgency"]
+    }
+
+    return "Waiting (safe)" as CaseRecord["urgency"]
+  }
+
+  if (record.priority === "Critical") {
+    return "2h left"
+  }
+
+  if (record.priority === "High" || record.breachRisk === "High" || record.signals.escalated) {
+    return "Today"
+  }
+
+  if (
+    record.priority === "Medium" ||
+    record.breachRisk === "Medium" ||
+    record.signals.needsAssignment ||
+    record.signals.waitingForFirstResponse
+  ) {
+    if (checkpointMoment) {
+      return `Review on ${checkpointMoment}` as CaseRecord["urgency"]
+    }
+
+    return "This week"
+  }
+
+  return record.priority === "Low" || record.breachRisk === "Low"
+    ? "Low"
+    : "This week"
+}
+
+function deriveOwner(record: MockCaseRecordBase) {
+  const assignee = record.assignee.trim()
+  const queue = record.queue.trim()
+
+  if (assignee) {
+    return assignee
+  }
+
+  if (queue) {
+    return `Unassigned - ${queue} queue`
+  }
+
+  return "Unassigned"
+}
+
+function deriveNextStep(
+  record: MockCaseRecordBase,
+  situation: NonNullable<CaseRecord["situation"]>
+) {
+  const checkpointMoment = getCheckpointMoment(deriveCheckpoint(record, situation))
+
+  if (record.status === "resolved") {
+    return "No further action planned"
+  }
+
+  if (!record.assignee.trim() || record.signals.needsAssignment) {
+    return record.signals.escalated ? "Assign an escalation owner" : "Assign an owner"
+  }
+
+  if (
+    record.signals.waitingOnCustomer ||
+    record.blockingReason === "awaiting_customer_reply" ||
+    record.blockingReason === "awaiting_customer_validation"
+  ) {
+    return (record.followUpsSent ?? 0) >= 2
+      ? checkpointMoment
+        ? `Wait for customer confirmation (close after ${checkpointMoment} if no reply)`
+        : "Wait for customer confirmation"
+      : "Wait for customer confirmation"
+  }
+
+  if (record.blockingReason === "awaiting_approval") {
+    return "Wait for approval to proceed"
+  }
+
+  if (record.blockingReason === "awaiting_engineering_fix") {
+    return "Wait for the internal fix and review the outcome"
+  }
+
+  if (situation === "New") {
+    return "Review the issue and send the first response"
+  }
+
+  if (situation === "Ready to close") {
+    return "Send the closure summary and close the case"
+  }
+
+  if (situation === "Escalated") {
+    return "Coordinate the specialist response"
+  }
+
+  return "Continue investigation and update the customer"
+}
+
+function getCheckpointMoment(checkpoint: string) {
+  const trimmed = checkpoint.trim()
+
+  if (!trimmed || trimmed === "No checkpoint set") {
+    return null
+  }
+
+  return trimmed
+    .replace(/^Follow up on /, "")
+    .replace(/^First response due /, "")
+    .replace(/^Review by /, "")
+}
+
+function deriveCheckpoint(
+  record: MockCaseRecordBase,
+  situation: NonNullable<CaseRecord["situation"]>
+) {
+  if (record.status === "resolved") {
+    return "No checkpoint set"
+  }
+
+  if (record.onHoldUntil.trim()) {
+    return `Follow up on ${formatDateLabel(record.onHoldUntil)}`
+  }
+
+  if (!record.firstResponse.trim() && record.responseTarget.trim()) {
+    return `First response due ${record.responseTarget}`
+  }
+
+  if (
+    situation === "Waiting on customer" ||
+    situation === "Waiting on internal team" ||
+    situation === "Escalated" ||
+    situation === "Ready to close"
+  ) {
+    return record.resolutionTarget.trim()
+      ? `Review by ${record.resolutionTarget}`
+      : "No checkpoint set"
+  }
+
+  if (record.responseTarget.trim()) {
+    return `Review by ${record.responseTarget}`
+  }
+
+  return record.resolutionTarget.trim()
+    ? `Review by ${record.resolutionTarget}`
+    : "No checkpoint set"
+}
+
+function deriveReason(
+  record: MockCaseRecordBase,
+  situation: NonNullable<CaseRecord["situation"]>
+) {
+  if (record.statusReason.trim()) {
+    return record.statusReason.trim()
+  }
+
+  if (!record.assignee.trim() || record.signals.needsAssignment) {
+    return "No owner is currently accountable for progressing the next step."
+  }
+
+  switch (record.blockingReason) {
+    case "awaiting_customer_reply":
+      return "The team is waiting for the customer to reply before progressing the case."
+    case "awaiting_customer_validation":
+      return "The team is waiting for the customer to confirm the corrected outcome."
+    case "awaiting_approval":
+      return "A required approval is still pending before the corrective action can proceed."
+    case "awaiting_engineering_fix":
+      return "An internal engineering repair is required before the case can move forward."
+    default:
+      break
+  }
+
+  if (record.signals.waitingForFirstResponse || situation === "New") {
+    return "The case is newly opened and still needs its first operational response."
+  }
+
+  if (situation === "Escalated") {
+    return "The case requires specialist handling to move forward."
+  }
+
+  if (situation === "Closed") {
+    return "Work is complete and the case is now closed."
+  }
+
+  return "The case is actively in progress and does not have a blocking dependency right now."
+}
+
+const initialCaseSignals = createCaseSignals({
+  waitingOnCustomer: true,
+})
+
+export const INITIAL_CASE_RECORD: CaseRecord = {
   title: "Finance team still cannot access the invoice portal after password resets",
   id: "CASE-10482",
   status: "in_progress",
-  signals: createCaseSignals({
-    waitingOnCustomer: true,
-  }),
+  signals: initialCaseSignals,
+  primarySignal: getPrimarySignal(initialCaseSignals),
+  situation: "",
+  urgency: "",
+  owner: "",
+  nextStep: "",
+  checkpoint: "",
+  reason: "",
   blockingReason: "awaiting_customer_validation",
   priority: "High",
   assignee: "Lucia Fernandez",
@@ -64,10 +388,10 @@ export const INITIAL_CASE_RECORD: CaseRecord = buildCaseRecord({
   emailThreadId: "THR-884291",
   callReference: "CALL-2026-04-01-1184",
   chatSessionId: "CHAT-SES-440218",
-})
+}
 
 export const EXAMPLE_CASES: CaseRecord[] = [
-  INITIAL_CASE_RECORD,
+  buildCaseRecord(INITIAL_CASE_RECORD),
   buildCaseRecord({
     ...INITIAL_CASE_RECORD,
     id: "CASE-10463",
@@ -787,6 +1111,206 @@ export const EXAMPLE_CASES: CaseRecord[] = [
     internalNotes:
       "Validation is complete and no blocker remains. Send the customer-facing closure summary and resolve the case.",
     emailThreadId: "THR-884647",
+    callReference: "",
+    chatSessionId: "",
+  }),
+  buildCaseRecord({
+    ...INITIAL_CASE_RECORD,
+    id: "CASE-10542",
+    title: "Customer reviewed the corrected statement header but still needs one clarification",
+    status: "in_progress",
+    signals: createCaseSignals({
+      waitingOnCustomer: true,
+    }),
+    situation: "Waiting on customer",
+    urgency: "",
+    owner: "Lucia Fernandez",
+    nextStep: "Wait for customer confirmation",
+    checkpoint: "Follow up on Apr 14, 2026",
+    reason:
+      "Customer is reviewing the corrected statement header but needs clarification about archived statements before confirming.",
+    blockingReason: "awaiting_customer_validation",
+    priority: "Low",
+    assignee: "Lucia Fernandez",
+    queue: "Document Delivery",
+    statusReason:
+      "Customer asked whether archived statements also reflect the corrected header before they confirm the final statement set.",
+    onHoldUntil: "2026-04-14",
+    channel: "Email",
+    severity: "Minor",
+    productArea: "Statement Delivery",
+    category: "Document templates / Archived statement clarification",
+    region: "Latin America",
+    source: "Customer Support Mailbox",
+    timelinePolicy: "Standard Support",
+    responseTarget: "2026-04-13 10:30 CET",
+    resolutionTarget: "2026-04-14 17:00 CET",
+    firstResponse: "2026-04-13 10:08 CET",
+    lastUpdate: "2026-04-13 15:42 CET",
+    slaStatus: "On track",
+    breachRisk: "Low",
+    customer: "Grupo Medico Esperanza",
+    contact: "Valeria Soto",
+    email: "valeria.soto@esperanza.example",
+    accountTier: "Professional",
+    contractType: "Professional annual plan",
+    routingGroup: "Document Delivery",
+    approvalRequired: "No",
+    approvalReason: "",
+    description:
+      "The corrected statement header was shared for review, but the customer still needs to know whether archived statements will reflect the same update before they confirm closure.",
+    internalNotes:
+      "Reply with the archive behavior and keep the case in a waiting state until the customer confirms the full statement set.",
+    emailThreadId: "THR-884688",
+    callReference: "",
+    chatSessionId: "",
+  }),
+  buildCaseRecord({
+    ...INITIAL_CASE_RECORD,
+    id: "CASE-10543",
+    title: "Customer is asking for an update while the remittance correction is still in progress",
+    status: "in_progress",
+    signals: createCaseSignals(),
+    situation: "In progress",
+    urgency: "Today",
+    owner: "Nadia Romero",
+    nextStep: "Continue investigation and update the customer",
+    checkpoint: "Review by Apr 15, 2026, 16:00 CET",
+    reason:
+      "Engineering is validating the remittance correction before the next export run and the customer needs a status update.",
+    blockingReason: "awaiting_engineering_fix",
+    priority: "High",
+    assignee: "Nadia Romero",
+    queue: "Finance Integrations",
+    statusReason:
+      "Internal validation is still in progress and the customer has asked whether the corrected remittance file will be ready before tomorrow's batch.",
+    onHoldUntil: "",
+    channel: "Email",
+    severity: "Major",
+    productArea: "Remittance Export",
+    category: "Correction validation / Batch readiness",
+    region: "Southern Europe",
+    source: "Customer Support Mailbox",
+    timelinePolicy: "Enterprise Standard",
+    responseTarget: "2026-04-15 10:00 CET",
+    resolutionTarget: "2026-04-15 16:00 CET",
+    firstResponse: "2026-04-15 09:12 CET",
+    lastUpdate: "2026-04-15 14:18 CET",
+    slaStatus: "At risk",
+    breachRisk: "Medium",
+    customer: "Clinica Mar Azul",
+    contact: "Irene Costa",
+    email: "irene.costa@marazul.example",
+    accountTier: "Professional",
+    contractType: "Professional annual plan",
+    routingGroup: "Finance Integrations",
+    approvalRequired: "No",
+    approvalReason: "",
+    description:
+      "A corrected remittance file is being validated after adjustment totals posted incorrectly, and the customer wants to know whether the repair will be ready before the next scheduled export.",
+    internalNotes:
+      "Give the customer a grounded status update without overcommitting before engineering confirms the corrected file is safe to release.",
+    emailThreadId: "THR-884691",
+    callReference: "",
+    chatSessionId: "",
+  }),
+  buildCaseRecord({
+    ...INITIAL_CASE_RECORD,
+    id: "CASE-10544",
+    title: "Customer confirmed the corrected export but asked for one final audit clarification",
+    status: "in_progress",
+    signals: createCaseSignals(),
+    situation: "Ready to close",
+    urgency: "",
+    owner: "Chiara Marino",
+    nextStep: "Send the closure summary and close the case",
+    checkpoint: "Review by Apr 16, 2026, 13:00 CET",
+    reason:
+      "The fix is confirmed and only a brief audit clarification remains before the case can close.",
+    blockingReason: "none",
+    priority: "Medium",
+    assignee: "Chiara Marino",
+    queue: "Customer Operations",
+    statusReason:
+      "Customer confirmed the corrected export is usable, but asked whether any earlier exports were affected for audit tracking.",
+    onHoldUntil: "",
+    channel: "Email",
+    severity: "Minor",
+    productArea: "Billing Contact Export",
+    category: "Export correction / Audit clarification",
+    region: "Central Europe",
+    source: "Customer Support Mailbox",
+    timelinePolicy: "Standard Support",
+    responseTarget: "2026-04-16 09:30 CET",
+    resolutionTarget: "2026-04-16 13:00 CET",
+    firstResponse: "2026-04-16 09:11 CET",
+    lastUpdate: "2026-04-16 11:26 CET",
+    slaStatus: "On track",
+    breachRisk: "Low",
+    customer: "Nordstern Dental Group",
+    contact: "Eva Kruger",
+    email: "eva.kruger@nordstern.example",
+    accountTier: "Enterprise",
+    contractType: "Enterprise subscription",
+    routingGroup: "Customer Operations",
+    approvalRequired: "No",
+    approvalReason: "",
+    description:
+      "The billing contact export has been corrected and validated, but the customer wants one final clarification for their audit notes before the case is closed.",
+    internalNotes:
+      "Reply with the audit clarification, then send the closure summary and resolve the case if no new issue appears.",
+    emailThreadId: "THR-884694",
+    callReference: "",
+    chatSessionId: "",
+  }),
+  buildCaseRecord({
+    ...INITIAL_CASE_RECORD,
+    id: "CASE-10545",
+    title: "Escalated billing portal repair missed the last update window and needs a new ETA",
+    status: "in_progress",
+    signals: createCaseSignals({
+      escalated: true,
+    }),
+    situation: "Escalated",
+    urgency: "Today",
+    owner: "Amelie Laurent",
+    nextStep: "Coordinate the specialist response",
+    checkpoint: "Review by Apr 15, 2026, 11:00 CET",
+    reason:
+      "The repair is delayed and the customer needs a clear ETA from the escalation owner.",
+    blockingReason: "awaiting_engineering_fix",
+    priority: "High",
+    assignee: "Amelie Laurent",
+    queue: "Platform Escalations",
+    statusReason:
+      "The repair update slipped past the committed window, and the customer is now asking for a new ETA and explanation.",
+    onHoldUntil: "",
+    channel: "Email",
+    severity: "Critical",
+    productArea: "Billing Portal",
+    category: "Escalation management / Delayed repair update",
+    region: "North America",
+    source: "Customer Support Mailbox",
+    timelinePolicy: "Enterprise Plus - Executive Escalation",
+    responseTarget: "2026-04-15 09:15 CET",
+    resolutionTarget: "2026-04-15 18:00 CET",
+    firstResponse: "2026-04-15 08:58 CET",
+    lastUpdate: "2026-04-15 10:22 CET",
+    slaStatus: "At risk",
+    breachRisk: "High",
+    customer: "Northlake Medical Network",
+    contact: "Sofia Bennett",
+    email: "sofia.bennett@northlake.example",
+    accountTier: "Enterprise Plus",
+    contractType: "Enterprise subscription with executive escalation coverage",
+    routingGroup: "Platform Escalations",
+    approvalRequired: "No",
+    approvalReason: "",
+    description:
+      "A billing portal repair remains escalated after the last customer update window slipped, and leadership now needs a firm ETA plus a clear explanation of what is still outstanding.",
+    internalNotes:
+      "Coordinate the next customer-facing update with the specialist owner so the new ETA is explicit and supportable.",
+    emailThreadId: "THR-884699",
     callReference: "",
     chatSessionId: "",
   }),
@@ -1703,6 +2227,211 @@ export const activityTimelineItemsByCaseId: Record<string, ActivityTimelineItem[
       organization: "VivaLaVita",
       content:
         "Validated the regenerated export against the affected clinic records. The missing adjustment codes are present and the case is ready to resolve after sending the closure summary.",
+    },
+  ],
+  "CASE-10542": [
+    {
+      id: "case-10542-activity-0",
+      timestamp: "Apr 13, 2026, 09:54 CET",
+      timestampDateTime: "2026-04-13T09:54:00+02:00",
+      type: "incoming",
+      actor: "Valeria Soto",
+      subtype: "Customer",
+      organization: "Grupo Medico Esperanza",
+      content:
+        "The updated statement header looks right for the current files. Will archived statements also show the same header, or do we need to approve those separately?",
+    },
+    {
+      id: "case-10542-activity-1",
+      timestamp: "Apr 13, 2026, 10:08 CET",
+      timestampDateTime: "2026-04-13T10:08:00+02:00",
+      type: "outgoing",
+      actor: "Lucia Fernandez",
+      subtype: "Support agent",
+      organization: "VivaLaVita",
+      content:
+        "Thanks for reviewing the current statement set. I'm checking the archive behavior now so we can confirm whether any separate approval is needed for the historical files.",
+    },
+    {
+      id: "case-10542-activity-2",
+      timestamp: "Apr 13, 2026, 10:41 CET",
+      timestampDateTime: "2026-04-13T10:41:00+02:00",
+      type: "comment",
+      actor: "Lucia Fernandez",
+      subtype: "Internal note",
+      organization: "VivaLaVita",
+      content:
+        "Customer is close to confirming the correction, but they want a clear answer on archived statement behavior before they sign off.",
+    },
+    {
+      id: "case-10542-activity-3",
+      timestamp: "Apr 13, 2026, 15:42 CET",
+      timestampDateTime: "2026-04-13T15:42:00+02:00",
+      type: "incoming",
+      actor: "Valeria Soto",
+      subtype: "Customer",
+      organization: "Grupo Medico Esperanza",
+      content:
+        "If archived statements stay unchanged, that's fine. We just need to know whether anything older than this month still needs approval from our finance lead.",
+    },
+  ],
+  "CASE-10543": [
+    {
+      id: "case-10543-activity-0",
+      timestamp: "Apr 15, 2026, 09:02 CET",
+      timestampDateTime: "2026-04-15T09:02:00+02:00",
+      type: "incoming",
+      actor: "Irene Costa",
+      subtype: "Customer",
+      organization: "Clinica Mar Azul",
+      content:
+        "Can you confirm whether the corrected remittance file will be ready before tomorrow's finance batch? We need to plan around it if not.",
+    },
+    {
+      id: "case-10543-activity-1",
+      timestamp: "Apr 15, 2026, 09:12 CET",
+      timestampDateTime: "2026-04-15T09:12:00+02:00",
+      type: "outgoing",
+      actor: "Nadia Romero",
+      subtype: "Support agent",
+      organization: "VivaLaVita",
+      content:
+        "We're validating the corrected remittance file now and will update you as soon as engineering confirms whether it is safe for the next batch window.",
+    },
+    {
+      id: "case-10543-activity-2",
+      timestamp: "Apr 15, 2026, 11:26 CET",
+      timestampDateTime: "2026-04-15T11:26:00+02:00",
+      type: "system",
+      actor: "Remittance validation workflow",
+      subtype: "System",
+      content:
+        "Validation job completed the first pass on the corrected remittance file and flagged one clinic-level adjustment total for manual review.",
+    },
+    {
+      id: "case-10543-activity-3",
+      timestamp: "Apr 15, 2026, 12:04 CET",
+      timestampDateTime: "2026-04-15T12:04:00+02:00",
+      type: "comment",
+      actor: "Nadia Romero",
+      subtype: "Internal note",
+      organization: "VivaLaVita",
+      content:
+        "Manual review is still in progress for one clinic total. We can reply with a grounded status update, but not a confirmed release time yet.",
+    },
+    {
+      id: "case-10543-activity-4",
+      timestamp: "Apr 15, 2026, 14:18 CET",
+      timestampDateTime: "2026-04-15T14:18:00+02:00",
+      type: "incoming",
+      actor: "Irene Costa",
+      subtype: "Customer",
+      organization: "Clinica Mar Azul",
+      content:
+        "Checking again before our planning call. Should we expect the corrected file today, or is this moving to tomorrow?",
+    },
+  ],
+  "CASE-10544": [
+    {
+      id: "case-10544-activity-0",
+      timestamp: "Apr 16, 2026, 08:48 CET",
+      timestampDateTime: "2026-04-16T08:48:00+02:00",
+      type: "incoming",
+      actor: "Eva Kruger",
+      subtype: "Customer",
+      organization: "Nordstern Dental Group",
+      content:
+        "The corrected billing contact export looks right now. Before we close this, can you confirm whether any files from last week were affected or only today's export?",
+    },
+    {
+      id: "case-10544-activity-1",
+      timestamp: "Apr 16, 2026, 09:11 CET",
+      timestampDateTime: "2026-04-16T09:11:00+02:00",
+      type: "outgoing",
+      actor: "Chiara Marino",
+      subtype: "Support agent",
+      organization: "VivaLaVita",
+      content:
+        "Thanks for confirming the corrected export. I'm checking the audit trail now so I can confirm whether any earlier files were affected before we send the closure summary.",
+    },
+    {
+      id: "case-10544-activity-2",
+      timestamp: "Apr 16, 2026, 10:06 CET",
+      timestampDateTime: "2026-04-16T10:06:00+02:00",
+      type: "system",
+      actor: "Export audit trail",
+      subtype: "System",
+      content:
+        "Audit review confirmed the contact-field correction only affected the Apr 16 export run and no prior billing contact files were modified.",
+    },
+    {
+      id: "case-10544-activity-3",
+      timestamp: "Apr 16, 2026, 11:26 CET",
+      timestampDateTime: "2026-04-16T11:26:00+02:00",
+      type: "incoming",
+      actor: "Eva Kruger",
+      subtype: "Customer",
+      organization: "Nordstern Dental Group",
+      content:
+        "Perfect, thanks. If that only affected today's file, a short written note for our audit folder is enough and we can close it after that.",
+    },
+  ],
+  "CASE-10545": [
+    {
+      id: "case-10545-activity-0",
+      timestamp: "Apr 15, 2026, 08:42 CET",
+      timestampDateTime: "2026-04-15T08:42:00+02:00",
+      type: "incoming",
+      actor: "Sofia Bennett",
+      subtype: "Customer",
+      organization: "Northlake Medical Network",
+      content:
+        "We did not receive the 08:30 update you committed to. What is the new ETA for the billing portal repair, and what is still blocking it?",
+    },
+    {
+      id: "case-10545-activity-1",
+      timestamp: "Apr 15, 2026, 08:58 CET",
+      timestampDateTime: "2026-04-15T08:58:00+02:00",
+      type: "outgoing",
+      actor: "Amelie Laurent",
+      subtype: "Support agent",
+      organization: "VivaLaVita",
+      content:
+        "I've kept the escalation active and am pulling the latest repair status from the specialist owner now. I'll confirm the next ETA as soon as I have a supportable update.",
+    },
+    {
+      id: "case-10545-activity-2",
+      timestamp: "Apr 15, 2026, 09:07 CET",
+      timestampDateTime: "2026-04-15T09:07:00+02:00",
+      type: "status-change",
+      typeLabel: "State change",
+      actor: "Amelie Laurent",
+      subtype: "Support operations",
+      organization: "VivaLaVita",
+      content:
+        "Case state remains Escalated while platform engineering completes the active billing portal repair and prepares the next customer-facing ETA.",
+    },
+    {
+      id: "case-10545-activity-3",
+      timestamp: "Apr 15, 2026, 09:34 CET",
+      timestampDateTime: "2026-04-15T09:34:00+02:00",
+      type: "comment",
+      actor: "Amelie Laurent",
+      subtype: "Internal note",
+      organization: "VivaLaVita",
+      content:
+        "Need a precise ETA from engineering before replying again. Avoid vague language because the missed update window is now part of the customer concern.",
+    },
+    {
+      id: "case-10545-activity-4",
+      timestamp: "Apr 15, 2026, 10:22 CET",
+      timestampDateTime: "2026-04-15T10:22:00+02:00",
+      type: "incoming",
+      actor: "Sofia Bennett",
+      subtype: "Customer",
+      organization: "Northlake Medical Network",
+      content:
+        "Please confirm whether this is still expected today. Finance leadership is asking whether we need to activate the workaround for another full cycle.",
     },
   ],
 }

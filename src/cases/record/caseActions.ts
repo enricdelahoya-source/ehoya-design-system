@@ -1,25 +1,22 @@
-import type { CaseRecord } from "./types"
+import type { CaseRecord, CaseSituation } from "./types"
 
 export type CaseState =
-  | "triage"
-  | "investigating"
-  | "waiting_on_customer"
-  | "escalated"
-  | "pending_approval"
-  | "ready_to_resolve"
-  | "closed"
+  | "New"
+  | "Needs owner"
+  | "In progress"
+  | "Waiting on customer"
+  | "Waiting on internal team"
+  | "Escalated"
+  | "Ready to close"
+  | "Closed"
 
 export type CaseAction =
   | "assign_owner"
-  | "reply_to_customer"
+  | "mark_customer_replied"
   | "send_follow_up"
   | "add_internal_note"
   | "escalate_case"
-  | "route_to_specialist"
-  | "route_to_approval"
-  | "notify_stakeholder"
-  | "resolve_case"
-  | "reopen_case"
+  | "close_case"
 
 export type CaseSignal = {
   slaRisk: "low" | "medium" | "high"
@@ -30,56 +27,52 @@ export const ACTIONS_BY_STATE: Record<
   CaseState,
   { primary: CaseAction; secondary: CaseAction[] }
 > = {
-  triage: {
+  New: {
     primary: "assign_owner",
-    secondary: ["reply_to_customer", "add_internal_note", "escalate_case"],
-  },
-  investigating: {
-    primary: "add_internal_note",
-    secondary: ["reply_to_customer", "route_to_specialist", "escalate_case"],
-  },
-  waiting_on_customer: {
-    primary: "send_follow_up",
     secondary: ["add_internal_note", "escalate_case"],
   },
-  escalated: {
-    primary: "route_to_specialist",
-    secondary: ["notify_stakeholder", "add_internal_note"],
+  "Needs owner": {
+    primary: "assign_owner",
+    secondary: ["add_internal_note", "escalate_case"],
   },
-  pending_approval: {
-    primary: "route_to_approval",
-    secondary: ["notify_stakeholder", "add_internal_note"],
+  "In progress": {
+    primary: "add_internal_note",
+    secondary: ["escalate_case"],
   },
-  ready_to_resolve: {
-    primary: "resolve_case",
-    secondary: ["reply_to_customer", "add_internal_note"],
+  "Waiting on customer": {
+    primary: "send_follow_up",
+    secondary: ["mark_customer_replied", "close_case", "escalate_case", "add_internal_note"],
   },
-  closed: {
-    primary: "reopen_case",
+  "Waiting on internal team": {
+    primary: "add_internal_note",
+    secondary: ["escalate_case"],
+  },
+  Escalated: {
+    primary: "add_internal_note",
+    secondary: ["close_case"],
+  },
+  "Ready to close": {
+    primary: "close_case",
+    secondary: ["add_internal_note"],
+  },
+  Closed: {
+    primary: "add_internal_note",
     secondary: [],
   },
 }
 
 export const ACTION_LABELS: Record<CaseAction, string> = {
   assign_owner: "Assign owner",
-  reply_to_customer: "Reply to customer",
+  mark_customer_replied: "Record customer reply",
   send_follow_up: "Send follow-up",
   add_internal_note: "Add internal note",
   escalate_case: "Escalate case",
-  route_to_specialist: "Route to specialist team",
-  route_to_approval: "Route case to approval workflow",
-  notify_stakeholder: "Notify stakeholder",
-  resolve_case: "Resolve case",
-  reopen_case: "Reopen case",
+  close_case: "Close case",
 }
 
 export function getPrimaryAction(state: CaseState, signals: CaseSignal): CaseAction | null {
-  if (state === "waiting_on_customer" && signals.noActionAvailable) {
+  if (state === "Waiting on customer" && signals.noActionAvailable) {
     return null
-  }
-
-  if (state === "escalated" && signals.slaRisk === "high") {
-    return "notify_stakeholder"
   }
 
   return ACTIONS_BY_STATE[state].primary
@@ -92,68 +85,46 @@ export function getSecondaryActions(state: CaseState, primary: CaseAction | null
 }
 
 export function getActionExplanation(state: CaseState, signals: CaseSignal): string {
-  if (state === "waiting_on_customer" && signals.noActionAvailable) {
-    return "All planned follow-ups have already been sent, so the team is waiting on customer input before taking another step."
+  if (state === "Waiting on customer" && signals.noActionAvailable) {
+    return "The case is still waiting on customer input. Follow-up is complete, so the remaining valid moves are to wait, close the case, or record that the customer replied."
   }
 
-  if (state === "pending_approval" && signals.slaRisk === "high") {
-    return "Approval is still required, and the case is now urgent because SLA risk is high."
-  }
-
-  if (state === "escalated" && signals.slaRisk === "high") {
-    return "The case is at high SLA risk and stakeholders need an immediate update while specialist handling continues."
+  if (state === "Escalated" && signals.slaRisk === "high") {
+    return "The case is escalated and still under time pressure, so operators should document the latest internal update before taking the next move."
   }
 
   switch (state) {
-    case "pending_approval":
-      return "Approval is required before the team can take the next corrective action."
-    case "waiting_on_customer":
+    case "New":
+      return "The case is new and needs an owner before the next operational step is clear."
+    case "Needs owner":
+      return "The case cannot move until one accountable owner is assigned."
+    case "In progress":
+      return "The case is actively being handled, so the next move should keep the work visible and moving."
+    case "Waiting on customer":
       return "Customer input is required before the case can progress."
-    case "escalated":
-      return "The case requires specialist handling to move forward."
-    case "ready_to_resolve":
-      return "All required steps are complete and the case can be resolved."
+    case "Waiting on internal team":
+      return "An internal dependency is holding the case, so the next move should capture progress or escalate if needed."
+    case "Escalated":
+      return "The case is escalated and should stay tightly coordinated until the next internal decision is clear."
+    case "Ready to close":
+      return "The work is complete and the case is ready for formal closure."
+    case "Closed":
+      return "The case is already closed, so no further action is required right now."
     default:
       return "Continue progressing the case based on the current state."
   }
 }
 
 export function resolveCaseState(
-  record: Pick<CaseRecord, "blockingReason" | "status" | "signals" | "primarySignal" | "statusReason">,
+  record: Pick<CaseRecord, "situation" | "status">,
 ): CaseState {
-  const normalizedStatusReason = record.statusReason.trim().toLowerCase()
+  const situation = record.situation.trim() as CaseSituation
 
-  if (record.status === "resolved") {
-    return "closed"
+  if (situation) {
+    return situation === "Closed" && record.status !== "resolved"
+      ? "In progress"
+      : situation
   }
 
-  if (record.blockingReason === "awaiting_approval") {
-    return "pending_approval"
-  }
-
-  if (
-    record.signals.waitingOnCustomer ||
-    record.blockingReason === "awaiting_customer_reply" ||
-    record.blockingReason === "awaiting_customer_validation"
-  ) {
-    return "waiting_on_customer"
-  }
-
-  if (normalizedStatusReason.includes("ready to resolve")) {
-    return "ready_to_resolve"
-  }
-
-  if (record.primarySignal === "escalated" || record.signals.escalated) {
-    return "escalated"
-  }
-
-  if (
-    record.primarySignal === "needs_assignment" ||
-    record.primarySignal === "waiting_for_first_response" ||
-    record.status === "new"
-  ) {
-    return "triage"
-  }
-
-  return "investigating"
+  return record.status === "resolved" ? "Closed" : "In progress"
 }

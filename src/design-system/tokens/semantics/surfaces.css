@@ -1,12 +1,21 @@
 @theme {
   --color-page: var(--color-warm-150);
   --color-surface: var(--color-warm-100);
-  --color-surface-hover: var(--color-warm-225);
-  --color-surface-muted: var(--color-warm-300);
+  --color-surface-hover: color-mix(in srgb, var(--color-surface) 94%, var(--color-accent) 6%);
+  --color-surface-muted: var(--color-surface-hover);
   --color-surface-structural-muted: var(--color-warm-175);
   --color-surface-elevated: var(--color-warm-50);
   --color-surface-shell: var(--color-warm-25);
   --color-surface-shell-editing: color-mix(in srgb, var(--color-accent) 4%, var(--color-surface-shell));
-  --color-surface-selected: var(--color-warm-250);
+  --color-surface-selected: color-mix(
+    in srgb,
+    var(--color-surface) 89%,
+    color-mix(in srgb, var(--color-accent) 46%, var(--color-action-brand) 54%)
+  );
+  --color-surface-feedback: color-mix(
+    in srgb,
+    var(--color-surface) 84%,
+    color-mix(in srgb, var(--color-accent) 38%, var(--color-action-brand) 62%)
+  );
   --color-surface-inverse: var(--color-warm-950);
 }

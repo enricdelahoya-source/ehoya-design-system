@@ -22,9 +22,9 @@ import Button from "../../design-system/components/Button"
 import Drawer from "../../design-system/components/Drawer"
 import Field from "../../design-system/components/fields/Field"
 import Link from "../../design-system/components/Link"
-import StatusBadge, {
-  type StatusBadgeEmphasis,
-  type StatusBadgeTone,
+import type {
+  StatusBadgeEmphasis,
+  StatusBadgeTone,
 } from "../../design-system/components/StatusBadge"
 import Tabs from "../../design-system/components/Tabs"
 import Select from "../../design-system/components/controls/Select"
@@ -70,6 +70,7 @@ type CaseRecordTemplateProps = {
   onAppendTimelineItem: (item: ActivityTimelineItem) => void
   onDismissSuggestedAction: () => void
   onOpenSuggestedActionComposer: () => void
+  onActivateSuggestedAction: (action: ActiveSuggestedAction) => void
   isAIDrawerOpen: boolean
   onToggleAIDrawer: () => void
   onCloseAIDrawer: () => void
@@ -120,6 +121,86 @@ const asideTitleStyles = {
   color: "var(--color-text-primary)",
 } as const
 
+function getCheckpointMoment(checkpoint: string) {
+  const trimmed = checkpoint.trim()
+
+  if (!trimmed || trimmed === "No checkpoint set") {
+    return null
+  }
+
+  return trimmed
+    .replace(/^Follow up on /, "")
+    .replace(/^First response due /, "")
+    .replace(/^Review by /, "")
+}
+
+function getImmediateNextStep(value: string) {
+  return value.replace(/\s*\([^)]*\)\s*$/, "").trim()
+}
+
+function getLatestTimelineItem(
+  items: ActivityTimelineItem[],
+  predicate: (item: ActivityTimelineItem) => boolean,
+) {
+  for (let index = items.length - 1; index >= 0; index -= 1) {
+    const item = items[index]
+
+    if (predicate(item)) {
+      return item
+    }
+  }
+
+  return null
+}
+
+function getLatestTimelineItemIndex(
+  items: ActivityTimelineItem[],
+  predicate: (item: ActivityTimelineItem) => boolean,
+) {
+  for (let index = items.length - 1; index >= 0; index -= 1) {
+    if (predicate(items[index])) {
+      return index
+    }
+  }
+
+  return -1
+}
+
+function sortOtherActionLabels(
+  state: ReturnType<typeof resolveCaseState>,
+  labels: string[]
+) {
+  if (state !== "Waiting on customer") {
+    return labels
+  }
+
+  const priority = [
+    "Record customer reply",
+    "Escalate case",
+    "Close case",
+    "Add internal note",
+  ]
+
+  return [...labels].sort((left, right) => {
+    const leftIndex = priority.indexOf(left)
+    const rightIndex = priority.indexOf(right)
+
+    if (leftIndex === -1 && rightIndex === -1) {
+      return 0
+    }
+
+    if (leftIndex === -1) {
+      return 1
+    }
+
+    if (rightIndex === -1) {
+      return -1
+    }
+
+    return leftIndex - rightIndex
+  })
+}
+
 export default function CaseRecordTemplate({
   record,
   status,
@@ -139,6 +220,7 @@ export default function CaseRecordTemplate({
   onAppendTimelineItem,
   onDismissSuggestedAction,
   onOpenSuggestedActionComposer,
+  onActivateSuggestedAction,
   isAIDrawerOpen,
   onToggleAIDrawer,
   onCloseAIDrawer,
@@ -166,15 +248,205 @@ export default function CaseRecordTemplate({
           ? "medium"
           : "low",
     noActionAvailable:
-      caseActionState === "waiting_on_customer" &&
+      caseActionState === "Waiting on customer" &&
       (mockSignalRecord.followUpsSent ?? 0) >= 2,
   } as const
   const primaryAction = getPrimaryAction(caseActionState, caseSignals)
   const primaryActionLabel = primaryAction ? ACTION_LABELS[primaryAction] : null
-  const secondaryActionLabels = getSecondaryActions(caseActionState, primaryAction).map(
-    (action) => ACTION_LABELS[action],
+  const secondaryActionLabels = sortOtherActionLabels(
+    caseActionState,
+    getSecondaryActions(caseActionState, primaryAction).map((action) => ACTION_LABELS[action]),
   )
+  const availableActionLabels = [
+    ...(primaryActionLabel ? [primaryActionLabel] : []),
+    ...secondaryActionLabels,
+  ]
+  const canEscalateCase = showEscalateAction && availableActionLabels.includes("Escalate case")
   const actionExplanation = getActionExplanation(caseActionState, caseSignals)
+  const checkpointMoment = getCheckpointMoment(record.checkpoint)
+  const nextStepSummary = getImmediateNextStep(record.nextStep.trim() || actionExplanation)
+  const normalizedNextStep = nextStepSummary.toLowerCase()
+  const latestIncomingEmailItem =
+    record.channel === "Email" && selectedActivityTimelineItems.length > 0
+      ? getLatestTimelineItem(
+          selectedActivityTimelineItems,
+          (item) => item.type === "incoming",
+        )
+      : null
+  const latestIncomingEmailIndex =
+    record.channel === "Email" && selectedActivityTimelineItems.length > 0
+      ? getLatestTimelineItemIndex(
+          selectedActivityTimelineItems,
+          (item) => item.type === "incoming",
+        )
+      : -1
+  const latestOutgoingEmailItem =
+    record.channel === "Email" && selectedActivityTimelineItems.length > 0
+      ? getLatestTimelineItem(
+          selectedActivityTimelineItems,
+          (item) => item.type === "outgoing",
+        )
+      : null
+  const latestOutgoingEmailIndex =
+    record.channel === "Email" && selectedActivityTimelineItems.length > 0
+      ? getLatestTimelineItemIndex(
+          selectedActivityTimelineItems,
+          (item) => item.type === "outgoing",
+        )
+      : -1
+  const needsEscalationOwner =
+    caseActionState === "Escalated" && (!record.assignee.trim() || record.signals.needsAssignment)
+  const needsOwnerAssignment = caseActionState === "Needs owner"
+  const nextStepIsPassive =
+    caseSignals.noActionAvailable ||
+    normalizedNextStep.startsWith("wait ") ||
+    normalizedNextStep.startsWith("no further action")
+  const nextStepRequiresCommunication =
+    normalizedNextStep.includes("reply") ||
+    normalizedNextStep.includes("send the closure summary") ||
+    normalizedNextStep.includes("send closure summary") ||
+    normalizedNextStep.includes("customer update") ||
+    normalizedNextStep.includes("update the customer") ||
+    normalizedNextStep.includes("first response")
+  const hasOutstandingCustomerMessage =
+    latestIncomingEmailIndex > latestOutgoingEmailIndex
+  const communicationComesFirst =
+    record.channel === "Email" &&
+    !needsOwnerAssignment &&
+    !needsEscalationOwner &&
+    !nextStepIsPassive &&
+    (hasOutstandingCustomerMessage || nextStepRequiresCommunication)
+  const nextStepExplanation = (() => {
+    if (needsEscalationOwner) {
+      return "Assign an escalation owner and coordinate the next response."
+    }
+
+    if (needsOwnerAssignment) {
+      return "Assign the case to an owner."
+    }
+
+    if (communicationComesFirst) {
+      if (caseActionState === "Ready to close") {
+        return "Reply with the closure summary or clarification, then close the case if no issues remain."
+      }
+
+      if (caseActionState === "Waiting on customer") {
+        return "Reply to clarify the remaining requirement, then wait for customer confirmation."
+      }
+
+      return "Reply with the next customer update so the case keeps moving."
+    }
+
+    if (caseActionState === "Waiting on customer") {
+      return checkpointMoment
+        ? `Wait for customer confirmation and review on ${checkpointMoment}.`
+        : "Wait for customer confirmation."
+    }
+
+    if (caseActionState === "Waiting on internal team") {
+      return checkpointMoment
+        ? `Wait for the internal dependency and review on ${checkpointMoment}.`
+        : "Wait for the internal dependency to clear."
+    }
+
+    if (caseActionState === "Ready to close" && (
+      normalizedNextStep === "close the case" ||
+      normalizedNextStep === "close case"
+    )) {
+      return "Close the case."
+    }
+
+    if (caseActionState === "In progress" && !communicationComesFirst) {
+      return "Continue investigation and prepare the next customer update."
+    }
+
+    return nextStepSummary || actionExplanation
+  })()
+  const mainDrawerAction = (() => {
+    if (needsEscalationOwner) {
+      return {
+        label: "Assign escalation owner",
+        onClick: handleOpenReassignment,
+        suppressLabels: ["Assign owner"],
+      }
+    }
+
+    if (needsOwnerAssignment) {
+      return {
+        label: "Assign owner",
+        onClick: handleOpenReassignment,
+        suppressLabels: ["Assign owner"],
+      }
+    }
+
+    if (communicationComesFirst && latestIncomingEmailItem) {
+      return {
+        label: "Reply",
+        onClick: () => {
+          onRecordTabChange("activity")
+          onActivateSuggestedAction({
+            label: "Reply to customer",
+            referenceId: latestIncomingEmailItem.id,
+            reason: nextStepExplanation,
+            composerOpen: true,
+          })
+        },
+        suppressLabels: [],
+      }
+    }
+
+    if (
+      caseActionState === "Ready to close" &&
+      record.channel === "Email" &&
+      !latestIncomingEmailItem &&
+      latestOutgoingEmailItem &&
+      (
+        normalizedNextStep.includes("send the closure summary") ||
+        normalizedNextStep.includes("send closure summary")
+      )
+    ) {
+      return {
+        label: "Reply",
+        onClick: () => {
+          onRecordTabChange("activity")
+          onActivateSuggestedAction({
+            label: "Follow up with customer",
+            referenceId: latestOutgoingEmailItem.id,
+            reason: nextStepExplanation,
+            composerOpen: true,
+          })
+        },
+        suppressLabels: [],
+      }
+    }
+
+    if (
+      caseActionState === "Ready to close" &&
+      (
+        normalizedNextStep === "close the case" ||
+        normalizedNextStep === "close case"
+      )
+    ) {
+      return {
+        label: "Close case",
+        onClick: onEnterEditMode,
+        suppressLabels: ["Close case"],
+      }
+    }
+
+    if (primaryActionLabel === "Escalate case") {
+      return {
+        label: "Escalate case",
+        onClick: handleOpenEscalation,
+        suppressLabels: ["Escalate case"],
+      }
+    }
+
+    return null
+  })()
+  const otherActionLabels = availableActionLabels.filter(
+    (actionLabel) => !mainDrawerAction?.suppressLabels.includes(actionLabel)
+  )
   const headerMetadataItems = [
     record.customer.trim(),
     record.assignee.trim(),
@@ -212,12 +484,12 @@ export default function CaseRecordTemplate({
   }, [record.id])
 
   useEffect(() => {
-    if (!showEscalateAction) {
+    if (!canEscalateCase) {
       setIsEscalateOpen(false)
       setEscalationReason("")
       setEscalationNote("")
     }
-  }, [showEscalateAction])
+  }, [canEscalateCase])
 
   const trimmedReassignmentAssignee = reassignmentAssignee.trim()
   const trimmedReassignmentTeam = reassignmentTeam.trim()
@@ -230,11 +502,6 @@ export default function CaseRecordTemplate({
       ? []
       : REASSIGNMENT_OPTIONS[trimmedReassignmentTeam as keyof typeof REASSIGNMENT_OPTIONS] ?? []
 
-  function handleOpenReassignment() {
-    setIsEscalateOpen(false)
-    setIsReassignOpen(true)
-  }
-
   function handleReassignmentTeamChange(nextTeam: string) {
     setReassignmentTeam(nextTeam)
     setReassignmentAssignee("")
@@ -245,15 +512,31 @@ export default function CaseRecordTemplate({
     setIsEscalateOpen(true)
   }
 
-  function handleOpenReassignmentFromMenu() {
-    setIsMoreActionsOpen(false)
-    handleOpenReassignment()
-  }
-
   function handleOpenEscalationFromMenu() {
     setIsMoreActionsOpen(false)
     handleOpenEscalation()
   }
+
+  function handleOpenReassignment() {
+    setIsEscalateOpen(false)
+    setIsReassignOpen(true)
+  }
+
+  const availableActionLabelSet = new Set(availableActionLabels)
+  const moreActionItems = [
+    ...(availableActionLabelSet.has("Record customer reply")
+      ? [{ label: "Record customer reply" }]
+      : []),
+    ...(canEscalateCase
+      ? [{
+          label: "Escalate case",
+          onSelect: handleOpenEscalationFromMenu,
+        }]
+      : []),
+    ...(availableActionLabelSet.has("Close case")
+      ? [{ label: "Close case" }]
+      : []),
+  ]
 
   function handleCancelReassignment() {
     setIsReassignOpen(false)
@@ -323,26 +606,28 @@ export default function CaseRecordTemplate({
               <div
                 role="menu"
                 aria-label="More actions"
-                className="absolute top-[calc(100%+var(--space-1))] left-0 z-10 min-w-[10rem] rounded-[var(--radius-sm)] border border-[var(--color-border-divider)] bg-[var(--color-surface-elevated)] py-[var(--space-1)]"
+                className="absolute top-[calc(100%+var(--space-1))] left-0 z-10 min-w-[12rem] rounded-[var(--radius-sm)] border border-[var(--color-border-divider)] bg-[var(--color-surface-elevated)] py-[var(--space-1)]"
               >
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={handleOpenReassignmentFromMenu}
-                  className="block w-full px-[var(--space-inline-sm)] py-[var(--space-1)] text-left text-sm leading-[var(--leading-normal)] text-[color:var(--color-text-primary)] transition-colors hover:bg-[var(--color-surface-muted)] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--color-focus-ring)]"
-                >
-                  Reassign
-                </button>
-                {showEscalateAction ? (
-                  <button
-                    type="button"
-                    role="menuitem"
-                    onClick={handleOpenEscalationFromMenu}
-                    className="block w-full px-[var(--space-inline-sm)] py-[var(--space-1)] text-left text-sm leading-[var(--leading-normal)] text-[color:var(--color-text-primary)] transition-colors hover:bg-[var(--color-surface-muted)] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--color-focus-ring)]"
-                  >
-                    Escalate
-                  </button>
-                ) : null}
+                {moreActionItems.map((item) =>
+                  item.onSelect ? (
+                    <button
+                      key={item.label}
+                      type="button"
+                      role="menuitem"
+                      onClick={item.onSelect}
+                      className="block w-full px-[var(--space-inline-sm)] py-[var(--space-1)] text-left text-sm leading-[var(--leading-normal)] text-[color:var(--color-text-primary)] transition-colors hover:bg-[var(--color-surface-muted)] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--color-focus-ring)]"
+                    >
+                      {item.label}
+                    </button>
+                  ) : (
+                    <div
+                      key={item.label}
+                      className="px-[var(--space-inline-sm)] py-[var(--space-1)] text-left text-sm leading-[var(--leading-normal)] text-[color:var(--color-text-primary)]"
+                    >
+                      {item.label}
+                    </div>
+                  )
+                )}
               </div>
             ) : null}
           </div>
@@ -531,6 +816,13 @@ export default function CaseRecordTemplate({
                   className="h-full"
                   highlightedItemId={highlightedTimelineItemId}
                   activeSuggestedAction={activeSuggestedAction}
+                  replyDraftContext={{
+                    customerName: record.contact || record.customer,
+                    situation: record.situation,
+                    nextStep: record.nextStep,
+                    reason: record.reason,
+                    ownerName: record.owner,
+                  }}
                   onAppendTimelineItem={onAppendTimelineItem}
                   onSendSuggestedAction={onSendSuggestedAction}
                   onDismissSuggestedAction={onDismissSuggestedAction}
@@ -585,24 +877,6 @@ export default function CaseRecordTemplate({
             </div>
           </section>
 
-          {aiRecordInsight.signals.length > 0 ? (
-            <section className="mt-[var(--space-6)] space-y-[var(--space-2)]">
-              <h3 className="m-0" style={asideTitleStyles}>
-                Key factors
-              </h3>
-              <ul className="list-outside list-disc space-y-[var(--space-1)] pt-[var(--space-1)] pl-[var(--space-4)] marker:text-[color:var(--color-text-secondary)]">
-                {aiRecordInsight.signals.map((signal) => (
-                  <li
-                    key={signal}
-                    className="text-sm leading-normal text-[color:var(--color-text-primary)]"
-                  >
-                    {signal}
-                  </li>
-                ))}
-              </ul>
-            </section>
-          ) : null}
-
           <section className="mt-[var(--space-6)] space-y-[var(--space-2)]">
             <h3
               className="m-0 text-[color:var(--color-text-primary)]"
@@ -613,23 +887,12 @@ export default function CaseRecordTemplate({
             <div className="space-y-[var(--space-1)] pt-[var(--space-1)]">
               {aiRecordInsight.situation.map((item) => (
                 <div key={`${item.badge.label}-${item.ownership}`} className="space-y-[var(--space-1)]">
-                  <div>
-                    <StatusBadge
-                      tone={item.badge.tone}
-                      emphasis={item.badge.emphasis}
-                      size="sm"
-                    >
-                      {item.badge.label}
-                    </StatusBadge>
-                  </div>
+                  <p className="m-0 text-sm leading-normal text-[color:var(--color-text-primary)]">
+                    {item.badge.label}
+                  </p>
                   <p className="m-0 text-[length:var(--text-meta)] leading-[var(--leading-normal)] text-[color:var(--color-text-primary)]">
                     {`Owned by ${item.ownership}`}
                   </p>
-                  {item.condition ? (
-                    <p className="m-0 text-[length:var(--text-meta)] leading-[var(--leading-normal)] text-[color:var(--color-text-primary)]">
-                      {item.condition}
-                    </p>
-                  ) : null}
                 </div>
               ))}
             </div>
@@ -646,50 +909,39 @@ export default function CaseRecordTemplate({
                 </h3>
                 <div className="space-y-[var(--space-1)] pt-[var(--space-half)]">
                   <p className="m-0 text-sm leading-normal text-[color:var(--color-text-primary)]">
-                    {actionExplanation}
+                    {nextStepExplanation}
                   </p>
-                  {primaryActionLabel ? (
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      className="mt-[var(--space-2)] mb-[var(--space-2)] w-full"
-                    >
-                      {primaryActionLabel}
-                    </Button>
-                  ) : null}
                 </div>
               </div>
 
-              <div className="space-y-[var(--space-1)] pt-[var(--space-2)]">
-                <p className="m-0 text-[length:var(--text-xs)] leading-[var(--leading-normal)] text-[color:var(--color-text-muted)]">
-                  Other actions
-                </p>
+              {mainDrawerAction ? (
                 <div className="pt-[var(--space-half)]">
-                  <ActionList
-                    ariaLabel="Other actions"
-                    items={secondaryActionLabels.map((actionLabel) => ({
-                      label: actionLabel,
-                    }))}
-                  />
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="w-full"
+                    onClick={mainDrawerAction.onClick}
+                  >
+                    {mainDrawerAction.label}
+                  </Button>
                 </div>
-              </div>
-            </div>
-          </section>
+              ) : null}
 
-          <section className="mt-[var(--space-6)] space-y-[var(--space-2)]">
-            <h3 className="m-0" style={asideTitleStyles}>
-              Based on
-            </h3>
-            <div className="space-y-[var(--space-1)] pt-[var(--space-1)]">
-              {aiRecordInsight.basedOn.map((item) => (
-                <p
-                  key={item}
-                  className="m-0 text-[length:var(--text-meta)] leading-[var(--leading-normal)] text-[color:var(--color-text-secondary)]"
-                >
-                  {item}
-                </p>
-              ))}
+              {otherActionLabels.length > 0 ? (
+                <div className="space-y-[var(--space-1)] pt-[var(--space-2)]">
+                  <p className="m-0 text-[length:var(--text-xs)] leading-[var(--leading-normal)] text-[color:var(--color-text-muted)]">
+                    Other actions
+                  </p>
+                  <div className="pt-[var(--space-half)]">
+                    <ActionList
+                      ariaLabel="Other actions"
+                      items={otherActionLabels.map((actionLabel) => ({
+                        label: actionLabel,
+                      }))}
+                    />
+                  </div>
+                </div>
+              ) : null}
             </div>
           </section>
         </Drawer>
