@@ -1907,7 +1907,7 @@ function removeRedundantStatusOwnershipFields(
 }
 
 export function CaseScreenPage() {
-  const [recordTab, setRecordTab] = useState<"details" | "activity">("details")
+  const [recordTab, setRecordTab] = useState<"details" | "activity">("activity")
   const [screenView, setScreenView] = useState<"list" | "record">("list")
   const [mode, setMode] = useState<"view" | "edit">("view")
   const [isAIDrawerOpen, setIsAIDrawerOpen] = useState(true)
@@ -2177,7 +2177,7 @@ export function CaseScreenPage() {
 
     setSelectedCaseId(caseId)
     resetEditState(nextCase)
-    setRecordTab("details")
+    setRecordTab("activity")
     setIsAIDrawerOpen(true)
     setActiveSuggestedAction(null)
     setCreateCaseBaseline(null)

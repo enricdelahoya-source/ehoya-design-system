@@ -17,39 +17,14 @@ import ActivityTimeline, {
   type ActiveSuggestedAction,
   type ActivityTimelineItem,
 } from "../../design-system/components/ActivityTimeline"
-import ActionList from "../../design-system/components/ActionList"
 import Button from "../../design-system/components/Button"
-import Drawer from "../../design-system/components/Drawer"
 import Field from "../../design-system/components/fields/Field"
-import Link from "../../design-system/components/Link"
-import type {
-  StatusBadgeEmphasis,
-  StatusBadgeTone,
-} from "../../design-system/components/StatusBadge"
 import Tabs from "../../design-system/components/Tabs"
 import Select from "../../design-system/components/controls/Select"
 import Textarea from "../../design-system/components/controls/Textarea"
 import RecordPageTemplate from "../../design-system/templates/RecordPageTemplate"
-
-type AIRecordInsight = {
-  situation: {
-    badge: {
-      label: string
-      tone: StatusBadgeTone
-      emphasis: StatusBadgeEmphasis
-    }
-    ownership: string
-    condition?: string
-  }[]
-  caseSummary: string[]
-  signals: string[]
-  actions: {
-    label: string
-    referenceId?: string
-    reason?: string
-  }[]
-  basedOn: string[]
-}
+import CaseIntelligenceRail from "./CaseIntelligenceRail"
+import type { DecisionPanelInsight } from "./caseIntelligenceRailTypes"
 
 type CaseRecordTemplateProps = {
   record: CaseRecord
@@ -75,14 +50,14 @@ type CaseRecordTemplateProps = {
   onToggleAIDrawer: () => void
   onCloseAIDrawer: () => void
   aiUpdatedLabel: ReactNode
-  aiRecordInsight: AIRecordInsight
+  aiRecordInsight: DecisionPanelInsight
   onRefreshAIInsights: () => void
   onSendSuggestedAction: (actionLabel: ActiveSuggestedAction["label"]) => void
 }
 
 const recordTabs = [
-  { id: "details", label: "Details" },
   { id: "activity", label: "Activity" },
+  { id: "details", label: "Details" },
 ] as const
 
 const ESCALATION_REASON_OPTIONS = [
@@ -112,14 +87,6 @@ const REASSIGNMENT_OPTIONS = {
 } as const
 
 const REASSIGNMENT_TEAM_OPTIONS = Object.keys(REASSIGNMENT_OPTIONS)
-
-const asideTitleStyles = {
-  fontSize: "var(--text-aside-title)",
-  lineHeight: "var(--leading-aside-title)",
-  fontWeight: "var(--font-weight-bold)",
-  letterSpacing: "normal",
-  color: "var(--color-text-primary)",
-} as const
 
 function getCheckpointMoment(checkpoint: string) {
   const trimmed = checkpoint.trim()
@@ -835,116 +802,19 @@ export default function CaseRecordTemplate({
         </>
       }
       aiRegion={
-        <Drawer
+        <CaseIntelligenceRail
+          key={record.id}
           open={isAIDrawerOpen}
-          title="AI assistance"
-          metadata={aiUpdatedLabel}
-          subtitle="Generated from visible case details and recent activity."
+          updatedLabel={aiUpdatedLabel}
+          insight={aiRecordInsight}
+          nextStepExplanation={nextStepExplanation}
+          mainAction={mainDrawerAction}
+          otherActionLabels={otherActionLabels}
+          onRefreshInsights={onRefreshAIInsights}
           onToggle={onToggleAIDrawer}
-          toggleLabel={isAIDrawerOpen ? "Collapse AI assistance" : "Open AI assistance"}
-          railLabel="AI"
           onClose={onCloseAIDrawer}
-          closeLabel="Close AI assistance"
-          actions={
-            <Link
-              href="#"
-              className="text-[length:var(--text-xs)] leading-[var(--leading-normal)] text-[color:var(--color-text-secondary)] hover:text-[color:var(--color-text-primary)]"
-              onClick={(event) => {
-                event.preventDefault()
-                onRefreshAIInsights()
-              }}
-            >
-              Refresh insights
-            </Link>
-          }
-        >
-          <section className="space-y-[var(--space-2)]">
-            <h3
-              className="m-0 text-[color:var(--color-text-primary)]"
-              style={asideTitleStyles}
-            >
-              Case summary
-            </h3>
-            <div className="space-y-[var(--space-1)] pt-[var(--space-1)]">
-              {aiRecordInsight.caseSummary.map((item) => (
-                <p
-                  key={item}
-                  className="m-0 text-sm leading-normal text-[color:var(--color-text-primary)]"
-                >
-                  {item}
-                </p>
-              ))}
-            </div>
-          </section>
-
-          <section className="mt-[var(--space-6)] space-y-[var(--space-2)]">
-            <h3
-              className="m-0 text-[color:var(--color-text-primary)]"
-              style={asideTitleStyles}
-            >
-              Situation
-            </h3>
-            <div className="space-y-[var(--space-1)] pt-[var(--space-1)]">
-              {aiRecordInsight.situation.map((item) => (
-                <div key={`${item.badge.label}-${item.ownership}`} className="space-y-[var(--space-1)]">
-                  <p className="m-0 text-sm leading-normal text-[color:var(--color-text-primary)]">
-                    {item.badge.label}
-                  </p>
-                  <p className="m-0 text-[length:var(--text-meta)] leading-[var(--leading-normal)] text-[color:var(--color-text-primary)]">
-                    {`Owned by ${item.ownership}`}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          <section className="mt-[var(--space-6)] border-b border-[var(--color-border-divider)] pb-[var(--space-5)]">
-            <div className="space-y-[var(--space-3)] pt-[var(--space-1)]">
-              <div className="space-y-[var(--space-1)]">
-                <h3
-                  className="m-0 text-[color:var(--color-text-primary)]"
-                  style={asideTitleStyles}
-                >
-                  Next step
-                </h3>
-                <div className="space-y-[var(--space-1)] pt-[var(--space-half)]">
-                  <p className="m-0 text-sm leading-normal text-[color:var(--color-text-primary)]">
-                    {nextStepExplanation}
-                  </p>
-                </div>
-              </div>
-
-              {mainDrawerAction ? (
-                <div className="pt-[var(--space-half)]">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    className="w-full"
-                    onClick={mainDrawerAction.onClick}
-                  >
-                    {mainDrawerAction.label}
-                  </Button>
-                </div>
-              ) : null}
-
-              {otherActionLabels.length > 0 ? (
-                <div className="space-y-[var(--space-1)] pt-[var(--space-2)]">
-                  <p className="m-0 text-[length:var(--text-xs)] leading-[var(--leading-normal)] text-[color:var(--color-text-muted)]">
-                    Other actions
-                  </p>
-                  <div className="pt-[var(--space-half)]">
-                    <ActionList
-                      ariaLabel="Other actions"
-                      items={otherActionLabels.map((actionLabel) => ({
-                        label: actionLabel,
-                      }))}
-                    />
-                  </div>
-                </div>
-              ) : null}
-            </div>
-          </section>
-        </Drawer>
+          record={record}
+        />
       }
     />
   )

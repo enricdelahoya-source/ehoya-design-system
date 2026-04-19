@@ -9,6 +9,7 @@ type DrawerProps = {
   onToggle: () => void
   toggleLabel?: string
   railLabel?: ReactNode
+  railContent?: ReactNode
   onClose?: () => void
   closeLabel?: string
   children: ReactNode
@@ -23,6 +24,7 @@ export default function Drawer({
   onToggle,
   toggleLabel,
   railLabel,
+  railContent,
   onClose,
   closeLabel,
   children,
@@ -81,14 +83,12 @@ export default function Drawer({
     "w-[var(--control-height-sm)]",
     "shrink-0",
     "items-start",
-    "justify-center",
+    "justify-start",
     "border-l",
     "border-r",
     "border-r-[var(--color-border-divider)]",
     "border-l-[var(--color-border-divider)]",
     "bg-[var(--color-surface-shell)]",
-    "pt-[var(--space-4)]",
-    "pb-[var(--space-4)]",
   ].join(" ")
 
   const railTextClasses = [
@@ -226,16 +226,18 @@ export default function Drawer({
         ) : null}
 
         <div className={railShellClasses}>
-          <button
-            type="button"
-            className={railClasses}
-            onClick={onToggle}
-            aria-label={railToggleAriaLabel}
-            aria-expanded={open}
-            aria-controls={panelId}
-          >
-            {railLabel ? <span className={railTextClasses}>{railLabel}</span> : null}
-          </button>
+          {railContent ?? (
+            <button
+              type="button"
+              className={railClasses}
+              onClick={onToggle}
+              aria-label={railToggleAriaLabel}
+              aria-expanded={open}
+              aria-controls={panelId}
+            >
+              {railLabel ? <span className={railTextClasses}>{railLabel}</span> : null}
+            </button>
+          )}
         </div>
       </div>
     </aside>
