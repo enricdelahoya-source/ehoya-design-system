@@ -88,6 +88,46 @@ const REASSIGNMENT_OPTIONS = {
 
 const REASSIGNMENT_TEAM_OPTIONS = Object.keys(REASSIGNMENT_OPTIONS)
 
+// Temporary scroll-debug instrumentation. Remove after identifying the real clipping container.
+const CASE_RECORD_SCROLL_DEBUG = true
+const CASE_RECORD_SCROLL_DEBUG_TIMELINE_ROOT_CLASS =
+  "case-record-scroll-debug-timeline-root"
+const CASE_RECORD_SCROLL_DEBUG_CLASSES = {
+  tabPanelOuter:
+    "outline outline-1 outline-offset-[-1px] outline-[rgba(37,99,235,0.55)] bg-[rgba(37,99,235,0.04)]",
+  tabPanelScroll:
+    "outline outline-1 outline-offset-[-1px] outline-[rgba(245,158,11,0.55)] bg-[rgba(245,158,11,0.04)]",
+  detailsContent:
+    "outline outline-1 outline-offset-[-1px] outline-[rgba(34,197,94,0.55)] bg-[rgba(34,197,94,0.04)]",
+  activityWrapper:
+    "outline outline-1 outline-offset-[-1px] outline-[rgba(168,85,247,0.55)] bg-[rgba(168,85,247,0.04)]",
+  activityTimelineRoot:
+    "outline outline-1 outline-offset-[-1px] outline-[rgba(239,68,68,0.55)] bg-[rgba(239,68,68,0.04)]",
+} as const
+
+const PROVIDE_ETA_SUMMARY =
+  "Customer is asking for ETA on remittance correction before planning call"
+const PROVIDE_ETA_SUPPORTING_TEXT =
+  "Customer is waiting for timing confirmation"
+const DEFAULT_PROVIDE_ETA_REPLY = `Hi Irene,
+
+We're still validating the remittance correction on our side.
+We expect to have the updated file ready by tomorrow's export run.
+
+I'll confirm once it's available.
+
+Best,
+Nadia`
+
+function shouldUseProvideEtaFlow(record: CaseRecord) {
+  return (
+    record.channel === "Email" &&
+    record.contact.trim() === "Irene Costa" &&
+    record.productArea === "Remittance Export" &&
+    record.nextStep.toLowerCase().includes("update the customer")
+  )
+}
+
 function getCheckpointMoment(checkpoint: string) {
   const trimmed = checkpoint.trim()
 
@@ -168,6 +208,30 @@ function sortOtherActionLabels(
   })
 }
 
+function getScrollDebugMetrics(label: string, element: HTMLDivElement | null) {
+  if (!element) {
+    return null
+  }
+
+  const computedStyle = window.getComputedStyle(element)
+  const rect = element.getBoundingClientRect()
+
+  return {
+    label,
+    clientHeight: element.clientHeight,
+    scrollHeight: element.scrollHeight,
+    offsetHeight: element.offsetHeight,
+    rectHeight: Math.round(rect.height * 100) / 100,
+    scrollTop: Math.round(element.scrollTop * 100) / 100,
+    overflowY: computedStyle.overflowY,
+    canScroll: element.scrollHeight > element.clientHeight + 1,
+  }
+}
+
+type ScrollDebugMetric = NonNullable<
+  ReturnType<typeof getScrollDebugMetrics>
+>
+
 export default function CaseRecordTemplate({
   record,
   status,
@@ -199,12 +263,22 @@ export default function CaseRecordTemplate({
   const [isReassignOpen, setIsReassignOpen] = useState(false)
   const [isEscalateOpen, setIsEscalateOpen] = useState(false)
   const [isMoreActionsOpen, setIsMoreActionsOpen] = useState(false)
+  const [isProvideEtaOpen, setIsProvideEtaOpen] = useState(false)
+  const [provideEtaDraft, setProvideEtaDraft] = useState(DEFAULT_PROVIDE_ETA_REPLY)
+  const [hasSentProvideEta, setHasSentProvideEta] = useState(false)
+  const [scrollDebugMetrics, setScrollDebugMetrics] = useState<ScrollDebugMetric[]>([])
+  const [activeScrollDebugOwners, setActiveScrollDebugOwners] = useState<string[]>([])
   const [reassignmentAssignee, setReassignmentAssignee] = useState("")
   const [reassignmentTeam, setReassignmentTeam] = useState("")
   const [reassignmentNote, setReassignmentNote] = useState("")
   const [escalationReason, setEscalationReason] = useState("")
   const [escalationNote, setEscalationNote] = useState("")
   const moreActionsRef = useRef<HTMLDivElement | null>(null)
+  const tabPanelOuterRef = useRef<HTMLDivElement | null>(null)
+  const tabPanelScrollRef = useRef<HTMLDivElement | null>(null)
+  const detailsContentRef = useRef<HTMLDivElement | null>(null)
+  const activityWrapperRef = useRef<HTMLDivElement | null>(null)
+  const provideEtaFlowEnabled = shouldUseProvideEtaFlow(record) || hasSentProvideEta
   const caseActionState = resolveCaseState(record)
   const mockSignalRecord = record as CaseRecord & { followUpsSent?: number }
   const caseSignals = {
@@ -279,11 +353,18 @@ export default function CaseRecordTemplate({
     latestIncomingEmailIndex > latestOutgoingEmailIndex
   const communicationComesFirst =
     record.channel === "Email" &&
+    !provideEtaFlowEnabled &&
     !needsOwnerAssignment &&
     !needsEscalationOwner &&
     !nextStepIsPassive &&
     (hasOutstandingCustomerMessage || nextStepRequiresCommunication)
   const nextStepExplanation = (() => {
+    if (provideEtaFlowEnabled) {
+      return hasSentProvideEta
+        ? "Wait for customer confirmation after the ETA update."
+        : PROVIDE_ETA_SUPPORTING_TEXT
+    }
+
     if (needsEscalationOwner) {
       return "Assign an escalation owner and coordinate the next response."
     }
@@ -330,6 +411,18 @@ export default function CaseRecordTemplate({
     return nextStepSummary || actionExplanation
   })()
   const mainDrawerAction = (() => {
+    if (provideEtaFlowEnabled) {
+      if (hasSentProvideEta) {
+        return null
+      }
+
+      return {
+        label: "Provide ETA to customer",
+        onClick: handleOpenProvideEta,
+        suppressLabels: [],
+      }
+    }
+
     if (needsEscalationOwner) {
       return {
         label: "Assign escalation owner",
@@ -443,6 +536,9 @@ export default function CaseRecordTemplate({
     setIsReassignOpen(false)
     setIsEscalateOpen(false)
     setIsMoreActionsOpen(false)
+    setIsProvideEtaOpen(false)
+    setProvideEtaDraft(DEFAULT_PROVIDE_ETA_REPLY)
+    setHasSentProvideEta(false)
     setReassignmentAssignee("")
     setReassignmentTeam("")
     setReassignmentNote("")
@@ -457,6 +553,90 @@ export default function CaseRecordTemplate({
       setEscalationNote("")
     }
   }, [canEscalateCase])
+
+  useEffect(() => {
+    if (!CASE_RECORD_SCROLL_DEBUG) {
+      return
+    }
+
+    let frameId = 0
+    let nestedFrameId = 0
+    let cleanupScrollListeners = () => {}
+
+    function measureScrollDebugMetrics() {
+      const activityTimelineRoot =
+        tabPanelScrollRef.current?.querySelector<HTMLDivElement>(
+          `.${CASE_RECORD_SCROLL_DEBUG_TIMELINE_ROOT_CLASS}`,
+        ) ?? null
+      const metrics = [
+        getScrollDebugMetrics("tab-panel-outer", tabPanelOuterRef.current),
+        getScrollDebugMetrics("tab-panel-scroll", tabPanelScrollRef.current),
+        getScrollDebugMetrics("details-content", detailsContentRef.current),
+        getScrollDebugMetrics("activity-wrapper", activityWrapperRef.current),
+        getScrollDebugMetrics("activity-timeline-root", activityTimelineRoot),
+      ].filter((entry): entry is ScrollDebugMetric => entry !== null)
+      const activeVerticalScrollOwners = metrics
+        .filter((entry) =>
+          (entry.overflowY === "auto" || entry.overflowY === "scroll") &&
+          entry.canScroll,
+        )
+        .map((entry) => entry.label)
+
+      setScrollDebugMetrics(metrics)
+      setActiveScrollDebugOwners(activeVerticalScrollOwners)
+
+      console.groupCollapsed(
+        `[case-record-scroll-debug] ${record.id} · ${recordTab}`,
+      )
+      console.table(metrics)
+      console.log("Active vertical scroll owners:", activeVerticalScrollOwners)
+      console.groupEnd()
+
+      const scrollTargets = [
+        tabPanelOuterRef.current,
+        tabPanelScrollRef.current,
+        detailsContentRef.current,
+        activityWrapperRef.current,
+        activityTimelineRoot,
+      ].filter((element): element is HTMLDivElement => element !== null)
+
+      cleanupScrollListeners()
+
+      const handleScroll = () => {
+        measureScrollDebugMetrics()
+      }
+
+      scrollTargets.forEach((element) => {
+        element.addEventListener("scroll", handleScroll, { passive: true })
+      })
+
+      cleanupScrollListeners = () => {
+        scrollTargets.forEach((element) => {
+          element.removeEventListener("scroll", handleScroll)
+        })
+      }
+    }
+
+    frameId = window.requestAnimationFrame(() => {
+      nestedFrameId = window.requestAnimationFrame(() => {
+        measureScrollDebugMetrics()
+      })
+    })
+
+    return () => {
+      cleanupScrollListeners()
+      window.cancelAnimationFrame(frameId)
+      window.cancelAnimationFrame(nestedFrameId)
+    }
+  }, [
+    record.id,
+    recordTab,
+    isReassignOpen,
+    isEscalateOpen,
+    isProvideEtaOpen,
+    sections.length,
+    selectedActivityTimelineItems.length,
+  ])
 
   const trimmedReassignmentAssignee = reassignmentAssignee.trim()
   const trimmedReassignmentTeam = reassignmentTeam.trim()
@@ -475,6 +655,7 @@ export default function CaseRecordTemplate({
   }
 
   function handleOpenEscalation() {
+    setIsProvideEtaOpen(false)
     setIsReassignOpen(false)
     setIsEscalateOpen(true)
   }
@@ -485,8 +666,16 @@ export default function CaseRecordTemplate({
   }
 
   function handleOpenReassignment() {
+    setIsProvideEtaOpen(false)
     setIsEscalateOpen(false)
     setIsReassignOpen(true)
+  }
+
+  function handleOpenProvideEta() {
+    setIsReassignOpen(false)
+    setIsEscalateOpen(false)
+    setIsProvideEtaOpen(true)
+    onRecordTabChange("activity")
   }
 
   const availableActionLabelSet = new Set(availableActionLabels)
@@ -540,6 +729,52 @@ export default function CaseRecordTemplate({
     handleCancelEscalation()
   }
 
+  function handleCancelProvideEta() {
+    setIsProvideEtaOpen(false)
+    setProvideEtaDraft(DEFAULT_PROVIDE_ETA_REPLY)
+  }
+
+  function handleSendProvideEta() {
+    const trimmedProvideEtaDraft = provideEtaDraft.trim()
+
+    if (!trimmedProvideEtaDraft) {
+      return
+    }
+
+    const createdAt = new Date()
+
+    onAppendTimelineItem({
+      id: `activity-reply-${createdAt.getTime()}`,
+      timestamp: createdAt.toLocaleString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+      }),
+      timestampDateTime: createdAt.toISOString(),
+      type: "outgoing",
+      actor: record.owner.trim() || "Nadia Romero",
+      subtype: "Support agent",
+      organization: "VivaLaVita",
+      content: trimmedProvideEtaDraft,
+    })
+
+    setHasSentProvideEta(true)
+    setIsProvideEtaOpen(false)
+    setProvideEtaDraft(DEFAULT_PROVIDE_ETA_REPLY)
+    onDismissSuggestedAction()
+    onRecordTabChange("activity")
+  }
+
+  const displayedStatus =
+    hasSentProvideEta || (
+      status === "in_progress" &&
+      record.situation === "Waiting on customer"
+    )
+      ? "waiting_on_customer"
+      : status
+
   return (
     <RecordPageTemplate
       breadcrumbs={[
@@ -556,7 +791,7 @@ export default function CaseRecordTemplate({
         },
       ]}
       title={record.title}
-      status={status}
+      status={displayedStatus}
       metadata={headerMetadataItems.join(" • ")}
       actions={
         <>
@@ -605,7 +840,12 @@ export default function CaseRecordTemplate({
       }
       aiOpen={isAIDrawerOpen}
       mainContent={
-        <>
+        <div className="relative flex min-h-0 flex-1 flex-col">
+          {provideEtaFlowEnabled ? (
+            <p className="m-0 shrink-0 text-sm leading-normal text-[color:var(--color-text-secondary)]">
+              {PROVIDE_ETA_SUMMARY}
+            </p>
+          ) : null}
           {isReassignOpen ? (
             <section
               aria-label="Reassign case"
@@ -756,6 +996,51 @@ export default function CaseRecordTemplate({
               </div>
             </section>
           ) : null}
+          {provideEtaFlowEnabled && isProvideEtaOpen ? (
+            <section
+              aria-label="Provide ETA to customer"
+              className="shrink-0 border-y border-[var(--color-border-divider)] py-[var(--space-4)]"
+            >
+              <div className="space-y-[var(--space-3)]">
+                <div className="space-y-[var(--space-half)]">
+                  <h2 className="m-0 text-[length:var(--text-md)] leading-[var(--leading-normal)] font-medium text-[color:var(--color-text-primary)]">
+                    Reply to Irene
+                  </h2>
+                  <p className="m-0 text-[length:var(--text-meta)] leading-[var(--leading-normal)] text-[color:var(--color-text-secondary)]">
+                    {PROVIDE_ETA_SUPPORTING_TEXT}
+                  </p>
+                </div>
+
+                <Textarea
+                  size="sm"
+                  rows={8}
+                  value={provideEtaDraft}
+                  onChange={(event) => setProvideEtaDraft(event.target.value)}
+                  aria-label="Provide ETA reply"
+                />
+
+                <div className="flex flex-wrap items-center gap-[var(--space-2)]">
+                  <Button
+                    type="button"
+                    variant="primary"
+                    size="sm"
+                    disabled={!provideEtaDraft.trim()}
+                    onClick={handleSendProvideEta}
+                  >
+                    Send reply
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleCancelProvideEta}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            </section>
+          ) : null}
 
           <div className="shrink-0">
             <Tabs
@@ -765,41 +1050,142 @@ export default function CaseRecordTemplate({
             />
           </div>
 
-          <div className={`min-h-0 flex-1 pt-[var(--space-3)] ${recordTab === "activity" ? "overflow-hidden" : "overflow-y-auto"}`}>
-            <div className={`min-w-0 w-full ${recordTab === "activity" ? "h-full" : "space-y-[var(--space-6)]"}`}>
+          <div
+            ref={tabPanelOuterRef}
+            className={[
+              "min-h-0 flex-1 overflow-hidden pt-[var(--space-3)]",
+              CASE_RECORD_SCROLL_DEBUG ? CASE_RECORD_SCROLL_DEBUG_CLASSES.tabPanelOuter : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+          >
+            <div
+              ref={tabPanelScrollRef}
+              className={[
+                "min-h-0 h-full min-w-0 w-full",
+                recordTab === "details"
+                  ? "overflow-y-auto overscroll-contain"
+                  : "overflow-hidden",
+                CASE_RECORD_SCROLL_DEBUG ? CASE_RECORD_SCROLL_DEBUG_CLASSES.tabPanelScroll : "",
+              ]
+                .filter(Boolean)
+                .join(" ")}
+            >
               {recordTab === "details" ? (
-                sections.map((section) =>
-                  renderCaseRecordSection({
-                    section,
-                    record,
-                    renderMode: "view",
-                    updateField,
-                    getDisplayValue,
-                  })
-                )
+                <div
+                  ref={detailsContentRef}
+                  className={[
+                    "min-w-0 w-full space-y-[var(--space-6)]",
+                    CASE_RECORD_SCROLL_DEBUG ? CASE_RECORD_SCROLL_DEBUG_CLASSES.detailsContent : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                >
+                  {sections.map((section) =>
+                    renderCaseRecordSection({
+                      section,
+                      record,
+                      renderMode: "view",
+                      updateField,
+                      getDisplayValue,
+                    })
+                  )}
+                </div>
               ) : (
-                <ActivityTimeline
-                  items={selectedActivityTimelineItems}
-                  className="h-full"
-                  highlightedItemId={highlightedTimelineItemId}
-                  activeSuggestedAction={activeSuggestedAction}
-                  replyDraftContext={{
-                    customerName: record.contact || record.customer,
-                    situation: record.situation,
-                    nextStep: record.nextStep,
-                    reason: record.reason,
-                    ownerName: record.owner,
-                  }}
-                  onAppendTimelineItem={onAppendTimelineItem}
-                  onSendSuggestedAction={onSendSuggestedAction}
-                  onDismissSuggestedAction={onDismissSuggestedAction}
-                  onOpenSuggestedActionComposer={onOpenSuggestedActionComposer}
-                  scrollListOnly
-                />
+                <div
+                  ref={activityWrapperRef}
+                  className={[
+                    "min-h-0 h-full min-w-0 w-full overflow-y-auto overscroll-contain",
+                    CASE_RECORD_SCROLL_DEBUG ? CASE_RECORD_SCROLL_DEBUG_CLASSES.activityWrapper : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                >
+                  <ActivityTimeline
+                    items={selectedActivityTimelineItems}
+                    className={
+                      CASE_RECORD_SCROLL_DEBUG
+                        ? `${CASE_RECORD_SCROLL_DEBUG_TIMELINE_ROOT_CLASS} ${CASE_RECORD_SCROLL_DEBUG_CLASSES.activityTimelineRoot}`
+                        : undefined
+                    }
+                    highlightedItemId={highlightedTimelineItemId}
+                    activeSuggestedAction={provideEtaFlowEnabled ? null : activeSuggestedAction}
+                    replyDraftContext={{
+                      customerName: record.contact || record.customer,
+                      situation: record.situation,
+                      nextStep: record.nextStep,
+                      reason: record.reason,
+                      ownerName: record.owner,
+                    }}
+                    onAppendTimelineItem={onAppendTimelineItem}
+                    onSendSuggestedAction={onSendSuggestedAction}
+                    onDismissSuggestedAction={onDismissSuggestedAction}
+                    onOpenSuggestedActionComposer={onOpenSuggestedActionComposer}
+                    showReplyActions={!provideEtaFlowEnabled}
+                  />
+                </div>
               )}
             </div>
           </div>
-        </>
+          {CASE_RECORD_SCROLL_DEBUG ? (
+            <aside
+              aria-label="Case record scroll debug"
+              className="pointer-events-auto absolute top-[var(--space-4)] right-[var(--space-4)] z-20 max-h-[calc(100%-var(--space-8))] w-[min(20rem,calc(100%-var(--space-6)))] overflow-y-auto rounded-[var(--radius-sm)] border border-[var(--color-border-divider)] bg-[var(--color-surface-elevated)] p-[var(--space-3)]"
+            >
+              <div className="space-y-[var(--space-2)]">
+                <div className="space-y-[var(--space-half)]">
+                  <p className="text-[length:var(--text-xs)] leading-[var(--leading-normal)] font-medium text-[color:var(--color-text-primary)]">
+                    Scroll debug
+                  </p>
+                  <p className="text-[length:var(--text-xs)] leading-[var(--leading-normal)] text-[color:var(--color-text-muted)]">
+                    Active scroll owners: {activeScrollDebugOwners.join(", ") || "none"}
+                  </p>
+                </div>
+
+                {scrollDebugMetrics.map((metric) => {
+                  const isActiveOwner = activeScrollDebugOwners.includes(metric.label)
+
+                  return (
+                    <div
+                      key={metric.label}
+                      className={[
+                        "space-y-[var(--space-1)] rounded-[var(--radius-sm)] border px-[var(--space-2)] py-[var(--space-2)]",
+                        isActiveOwner
+                          ? "border-[var(--color-border-divider)] bg-[var(--color-surface-muted)]"
+                          : "border-[var(--color-border-divider)] bg-[var(--color-surface)]",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                    >
+                      <div className="flex items-center justify-between gap-[var(--space-2)]">
+                        <p className="text-[length:var(--text-xs)] leading-[var(--leading-normal)] font-medium text-[color:var(--color-text-primary)]">
+                          {metric.label}
+                        </p>
+                        {isActiveOwner ? (
+                          <span className="text-[length:var(--text-xs)] leading-[var(--leading-normal)] text-[color:var(--color-text-primary)]">
+                            scroll owner
+                          </span>
+                        ) : null}
+                      </div>
+                      <dl className="grid grid-cols-[auto_1fr] gap-x-[var(--space-2)] gap-y-[var(--space-half)] text-[length:var(--text-xs)] leading-[var(--leading-normal)] text-[color:var(--color-text-secondary)]">
+                        <dt>clientHeight</dt>
+                        <dd className="m-0">{metric.clientHeight}</dd>
+                        <dt>scrollHeight</dt>
+                        <dd className="m-0">{metric.scrollHeight}</dd>
+                        <dt>overflowY</dt>
+                        <dd className="m-0">{metric.overflowY}</dd>
+                        <dt>canScroll</dt>
+                        <dd className="m-0">{String(metric.canScroll)}</dd>
+                        <dt>scrollTop</dt>
+                        <dd className="m-0">{metric.scrollTop}</dd>
+                      </dl>
+                    </div>
+                  )
+                })}
+              </div>
+            </aside>
+          ) : null}
+        </div>
       }
       aiRegion={
         <CaseIntelligenceRail

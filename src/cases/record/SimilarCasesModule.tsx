@@ -50,14 +50,14 @@ export default function SimilarCasesModule({ record }: SimilarCasesModuleProps) 
   const similarCases = buildSimilarCaseReferences(record)
 
   return (
-    <section className="space-y-[var(--space-4)]" aria-label="Similar cases">
-      <div className="space-y-[var(--space-1)]">
+    <section className="flex h-full min-h-0 flex-col space-y-[var(--space-4)]" aria-label="Similar cases">
+      <div className="shrink-0 space-y-[var(--space-1)]">
         <p className="m-0 text-[length:var(--text-sm)] leading-[var(--leading-normal)] text-[color:var(--color-text-primary)]">
           Related cases provide context only. Use them to compare ownership, pacing, and next-step patterns.
         </p>
       </div>
 
-      <div className="space-y-[var(--space-3)]">
+      <div className="min-h-0 flex-1 space-y-[var(--space-3)] overflow-y-auto overscroll-contain">
         {similarCases.map((similarCase) => (
           <article
             key={similarCase.id}

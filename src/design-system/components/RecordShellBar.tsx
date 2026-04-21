@@ -61,6 +61,7 @@ export default function RecordShellBar({
    * identifier between title and metadata.
    */
   const container = [
+    "shrink-0",
     mode === "edit"
       ? "bg-[var(--color-surface-shell-editing)]"
       : "bg-[var(--color-surface-shell)]",

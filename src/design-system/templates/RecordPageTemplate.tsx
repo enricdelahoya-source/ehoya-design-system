@@ -43,10 +43,10 @@ export default function RecordPageTemplate({
         metadata={metadata}
         actions={actions}
       />
-      <div className="min-h-0 flex-1">
-        <div className="mx-auto flex h-full w-full max-w-[var(--content-width-xl)] min-h-0 px-[var(--space-section-sm)] md:px-[var(--space-section-md)]">
+      <div className="min-h-0 flex-1 overflow-hidden">
+        <div className="mx-auto flex h-full w-full max-w-[var(--content-width-xl)] min-h-0 overflow-hidden px-[var(--space-section-sm)] md:px-[var(--space-section-md)]">
           <div
-            className="grid h-full min-h-0 w-full items-stretch xl:[column-gap:var(--record-page-gap)] xl:[grid-template-columns:minmax(0,1fr)_var(--record-page-drawer-width)]"
+            className="grid h-full min-h-0 w-full items-stretch overflow-hidden xl:[column-gap:var(--record-page-gap)] xl:[grid-template-columns:minmax(0,1fr)_var(--record-page-drawer-width)]"
             style={
               {
                 "--record-page-gap": drawerGap,
@@ -54,11 +54,11 @@ export default function RecordPageTemplate({
               } as CSSProperties
             }
           >
-            <div className="flex min-w-0 min-h-0 w-full max-w-[var(--content-width-lg)] flex-col py-[var(--space-section-md)] xl:justify-self-start">
+            <div className="flex min-w-0 min-h-0 w-full max-w-[var(--content-width-lg)] flex-col overflow-hidden py-[var(--space-section-md)] xl:justify-self-start">
               {mainContent}
             </div>
 
-            <div className="min-h-0">
+            <div className="min-h-0 overflow-hidden">
               {aiRegion}
             </div>
           </div>

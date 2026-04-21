@@ -168,6 +168,7 @@ export default function Drawer({
     "min-h-0",
     "flex-1",
     "overflow-y-auto",
+    "overscroll-contain",
     "space-y-[var(--space-5)]",
     "px-[var(--space-4)]",
     "py-[var(--space-4)]",

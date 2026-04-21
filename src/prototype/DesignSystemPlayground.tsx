@@ -2535,7 +2535,7 @@ export function CaseScreenPage() {
     draftRecord.title.trim() !== "" && draftRecord.customer.trim() !== ""
 
   return (
-    <main className={`${screenView === "list" ? "min-h-screen" : "flex h-screen flex-col overflow-hidden"} bg-page text-text-default [font-family:var(--font-sans)]`}>
+    <main className={`${screenView === "list" ? "min-h-screen" : "fixed inset-0 flex min-h-0 flex-col overflow-hidden overscroll-none"} bg-page text-text-default [font-family:var(--font-sans)]`}>
       {screenView === "list" ? (
         <CasesListTemplate
           actions={

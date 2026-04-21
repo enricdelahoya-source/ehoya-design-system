@@ -44,6 +44,7 @@ type ActivityTimelineProps = {
   emptyMessage?: ReactNode
   className?: string
   scrollListOnly?: boolean
+  showReplyActions?: boolean
   highlightedItemId?: string | null
   activeSuggestedAction?: ActiveSuggestedAction | null
   onAppendTimelineItem?: (item: ActivityTimelineItem) => void
@@ -251,6 +252,82 @@ function buildAISummary(content: string) {
   return `${normalizedContent.slice(0, 117).trimEnd()}...`
 }
 
+function getOutgoingEmailBody(content: string) {
+  const lines = content
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+
+  if (lines.length === 0) {
+    return ""
+  }
+
+  const bodyLines = [...lines]
+
+  if (/^(hi|hello|dear)\b/i.test(bodyLines[0])) {
+    bodyLines.shift()
+  }
+
+  while (bodyLines.length > 0) {
+    const lastLine = bodyLines[bodyLines.length - 1]
+
+    if (/^(best|best regards|kind regards|regards|thanks|many thanks|sincerely)[,!]?$/i.test(lastLine)) {
+      bodyLines.pop()
+
+      if (bodyLines.length > 0) {
+        bodyLines.pop()
+      }
+
+      continue
+    }
+
+    break
+  }
+
+  return bodyLines.join(" ").replace(/\s+/g, " ").trim()
+}
+
+function buildOutgoingEmailSummary(content: string) {
+  const normalizedBody = getOutgoingEmailBody(content).toLowerCase()
+
+  if (!normalizedBody) {
+    return undefined
+  }
+
+  if (
+    normalizedBody.includes("updated file ready by tomorrow's export run") ||
+    normalizedBody.includes("updated file ready by tomorrow’s export run") ||
+    normalizedBody.includes("have the updated file ready by tomorrow's export run") ||
+    normalizedBody.includes("have the updated file ready by tomorrow’s export run")
+  ) {
+    return "Shared ETA: updated file expected by tomorrow's export run"
+  }
+
+  if (normalizedBody.includes("waiting for your confirmation")) {
+    return "Requested customer confirmation on the latest update"
+  }
+
+  if (normalizedBody.includes("correction is complete on our side")) {
+    return "Shared resolution update: correction is complete and ready for customer review"
+  }
+
+  const firstSentenceMatch = normalizedBody.match(/^(.+?[.!?])(?:\s|$)/)
+  const firstSentence = firstSentenceMatch
+    ? firstSentenceMatch[1]
+    : normalizedBody
+
+  const cleanedSentence = firstSentence
+    .replace(/\s+/g, " ")
+    .replace(/[.!?]+$/, "")
+    .trim()
+
+  if (!cleanedSentence) {
+    return undefined
+  }
+
+  return `Sent update: ${cleanedSentence.charAt(0).toLowerCase()}${cleanedSentence.slice(1)}`
+}
+
 function getVisibleAISummaryItemIds(items: ActivityTimelineItem[]) {
   const visibleIds = new Set<string>()
   const dateKeysWithVisibleSummary = new Set<string>()
@@ -291,6 +368,7 @@ export default function ActivityTimeline({
   emptyMessage = "No activity yet.",
   className = "",
   scrollListOnly = false,
+  showReplyActions = true,
   highlightedItemId = null,
   activeSuggestedAction = null,
   onAppendTimelineItem,
@@ -320,7 +398,8 @@ export default function ActivityTimeline({
 
   const rootClasses = [
     "w-full",
-    scrollListOnly ? "flex h-full min-h-0 flex-col" : "",
+    "h-auto",
+    scrollListOnly ? "flex min-h-0 flex-col" : "",
     className,
   ].filter(Boolean).join(" ")
   const composerClasses = [
@@ -345,6 +424,7 @@ export default function ActivityTimeline({
     "flex-1",
     "overflow-y-auto",
     "pt-[var(--space-stack-md)]",
+    "pb-[var(--space-3)]",
   ].join(" ")
 
   const groupClasses = [
@@ -378,6 +458,9 @@ export default function ActivityTimeline({
     "first:pt-0",
     "transition-[background-color,border-color,box-shadow]",
     "duration-700",
+  ].join(" ")
+  const freshSentReplyClasses = [
+    "bg-[var(--color-surface-muted)]",
   ].join(" ")
 
   const identityRowClasses = [
@@ -691,6 +774,15 @@ ${ownerSignOffName}`
   }
 
   useEffect(() => {
+    if (showReplyActions) {
+      return
+    }
+
+    setReplyDraft("")
+    setReplyComposerItemId(null)
+  }, [showReplyActions])
+
+  useEffect(() => {
     if (!activeSuggestedAction || !activeSuggestedAction.composerOpen) {
       setReplyDraft("")
       return
@@ -712,6 +804,27 @@ ${ownerSignOffName}`
     activeSuggestedAction?.referenceId,
   ])
 
+  useEffect(() => {
+    if (!highlightedItemId) {
+      return
+    }
+
+    const highlightedItem = timelineItems.find((item) => item.id === highlightedItemId)
+
+    if (highlightedItem?.type !== "outgoing") {
+      return
+    }
+
+    setExpandedItemIds((current) => (
+      current[highlightedItemId]
+        ? current
+        : {
+            ...current,
+            [highlightedItemId]: true,
+          }
+    ))
+  }, [highlightedItemId, timelineItems])
+
   function handleCancelComposer() {
     setDraftNote("")
     setComposerActivityType("internal-note")
@@ -724,11 +837,12 @@ ${ownerSignOffName}`
     }
 
     const createdAt = new Date()
+    const nextItemId = `activity-note-${createdAt.getTime()}`
 
     setDraftItems((current) => [
       ...current,
       {
-        id: `activity-note-${createdAt.getTime()}`,
+        id: nextItemId,
         timestamp: createdAt.toLocaleString("en-US", {
           month: "short",
           day: "numeric",
@@ -745,6 +859,12 @@ ${ownerSignOffName}`
         aiSummary: buildAISummary(trimmedDraftNote),
       },
     ])
+    if (composerActivityType === "email-sent") {
+      setExpandedItemIds((current) => ({
+        ...current,
+        [nextItemId]: true,
+      }))
+    }
     setDraftNote("")
     setComposerActivityType("internal-note")
     setIsComposerOpen(false)
@@ -780,9 +900,10 @@ ${ownerSignOffName}`
     }
 
     const createdAt = new Date()
+    const nextReplyItemId = `activity-reply-${createdAt.getTime()}`
 
     const nextReplyItem: ActivityTimelineItem = {
-      id: `activity-reply-${createdAt.getTime()}`,
+      id: nextReplyItemId,
       timestamp: createdAt.toLocaleString("en-US", {
         month: "short",
         day: "numeric",
@@ -799,6 +920,10 @@ ${ownerSignOffName}`
       aiSummary: buildAISummary(trimmedReplyDraft),
     }
 
+    setExpandedItemIds((current) => ({
+      ...current,
+      [nextReplyItemId]: true,
+    }))
     onAppendTimelineItem?.(nextReplyItem)
     if (activeSuggestedAction) {
       onCompleteSuggestedAction?.(activeSuggestedAction.label)
@@ -813,21 +938,15 @@ ${ownerSignOffName}`
     <div className={rootClasses}>
       <style>
         {`
-          @keyframes activity-timeline-sent-highlight {
+          @keyframes activity-timeline-sent-enter {
             from {
-              background-color: transparent;
-            }
-
-            12% {
-              background-color: var(--color-surface-feedback);
-            }
-
-            76% {
-              background-color: var(--color-surface-feedback);
+              opacity: 0;
+              transform: translateY(4px);
             }
 
             to {
-              background-color: transparent;
+              opacity: 1;
+              transform: translateY(0);
             }
           }
         `}
@@ -924,8 +1043,14 @@ ${ownerSignOffName}`
                     const textContent =
                       typeof item.content === "string" ? item.content : null
                     const isTextContent = textContent !== null
+                    const outgoingEmailSummary =
+                      item.type === "outgoing" && isTextContent
+                        ? buildOutgoingEmailSummary(textContent)
+                        : undefined
                     const isLongContent =
                       isTextContent && textContent.length > COLLAPSED_CONTENT_LENGTH
+                    const showOutgoingEmailDetail =
+                      Boolean(outgoingEmailSummary) && isLongContent
                     const isExpanded = expandedItemIds[item.id] ?? false
                     const isDeletableInternalNote =
                       item.actor === "You" &&
@@ -933,27 +1058,40 @@ ${ownerSignOffName}`
                       item.subtype === "Internal note"
                     const hasAISummary = visibleAISummaryItemIds.has(item.id)
                     const showReplyComposer =
-                      (activeSuggestedAction?.referenceId === item.id &&
-                        activeSuggestedAction.composerOpen) ||
-                      replyComposerItemId === item.id
+                      showReplyActions && (
+                        (activeSuggestedAction?.referenceId === item.id &&
+                          activeSuggestedAction.composerOpen) ||
+                        replyComposerItemId === item.id
+                      )
                     const showFollowUpActionBar =
+                      showReplyActions &&
                       activeSuggestedAction?.label === "Follow up with customer" &&
                       activeSuggestedAction.referenceId === item.id &&
                       !activeSuggestedAction.composerOpen
                     const showReplyAction =
-                      item.type === "incoming" && !showReplyComposer && !showFollowUpActionBar
+                      showReplyActions &&
+                      item.type === "incoming" &&
+                      !showReplyComposer &&
+                      !showFollowUpActionBar
                     const isFreshSentReply =
                       highlightedItemId === item.id && item.type === "outgoing"
+                    const showAISummary =
+                      hasAISummary && !showOutgoingEmailDetail
 
                     return (
                       <li
                         key={item.id}
                         id={item.id}
-                        className={itemClasses}
+                        className={[
+                          itemClasses,
+                          isFreshSentReply ? freshSentReplyClasses : "",
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
                         style={
                           isFreshSentReply
                             ? {
-                                animation: "activity-timeline-sent-highlight 1150ms ease-out",
+                                animation: "activity-timeline-sent-enter 180ms ease-out",
                               }
                             : undefined
                         }
@@ -1020,17 +1158,38 @@ ${ownerSignOffName}`
                         ) : null}
 
                         <div className={contentRowClasses}>
-                          <div
-                            className={[
-                              contentClasses,
-                              isLongContent && !isExpanded ? collapsedContentClasses : "",
-                            ]
-                              .filter(Boolean)
-                              .join(" ")}
-                          >
-                            {item.content}
-                          </div>
-                          {hasAISummary ? (
+                          {showOutgoingEmailDetail ? (
+                            <div className="space-y-[var(--space-2)]">
+                              <div className={contentClasses}>{outgoingEmailSummary}</div>
+                              {isExpanded ? (
+                                <div className={summaryWrapClasses}>
+                                  <div
+                                    className={[
+                                      summaryClasses,
+                                      "whitespace-pre-wrap",
+                                      "break-words",
+                                    ]
+                                      .filter(Boolean)
+                                      .join(" ")}
+                                  >
+                                    {item.content}
+                                  </div>
+                                </div>
+                              ) : null}
+                            </div>
+                          ) : (
+                            <div
+                              className={[
+                                contentClasses,
+                                isLongContent && !isExpanded ? collapsedContentClasses : "",
+                              ]
+                                .filter(Boolean)
+                                .join(" ")}
+                            >
+                              {item.content}
+                            </div>
+                          )}
+                          {showAISummary ? (
                             <div className={summaryWrapClasses}>
                               <div className={summaryLabelClasses}>AI summary</div>
                               <p
@@ -1053,7 +1212,13 @@ ${ownerSignOffName}`
                                   className={actionButtonClasses}
                                   onClick={() => toggleExpandedItem(item.id)}
                                 >
-                                  {isExpanded ? "Show less" : "Show more"}
+                                  {showOutgoingEmailDetail
+                                    ? isExpanded
+                                      ? "Hide full email"
+                                      : "Show full email"
+                                    : isExpanded
+                                      ? "Show less"
+                                      : "Show more"}
                                 </button>
                               ) : null}
 
