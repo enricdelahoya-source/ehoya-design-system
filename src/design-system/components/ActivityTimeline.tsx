@@ -303,6 +303,20 @@ function buildOutgoingEmailSummary(content: string) {
     return "Shared ETA: updated file expected by tomorrow's export run"
   }
 
+  if (
+    normalizedBody.includes("reviewing the invoice portal access state") &&
+    normalizedBody.includes("hold off on any additional password resets")
+  ) {
+    return "Confirmed investigation started and asked customer to avoid further password resets."
+  }
+
+  if (
+    normalizedBody.includes("corrected the account state") &&
+    normalizedBody.includes("resynchronized the affected finance roles")
+  ) {
+    return "Asked customer to confirm portal access after account and role synchronization fix."
+  }
+
   if (normalizedBody.includes("waiting for your confirmation")) {
     return "Requested customer confirmation on the latest update"
   }
@@ -418,6 +432,10 @@ export default function ActivityTimeline({
     "text-[color:var(--color-text-secondary)]",
   ].join(" ")
   const groupsClasses = ["space-y-[var(--space-stack-md)]"].join(" ")
+  const timelineGroupsRegionClasses = [
+    "pt-[var(--space-3)]",
+    groupsClasses,
+  ].join(" ")
   const scrollRegionClasses = [
     "pt-[var(--space-stack-md)]",
     "pb-[var(--space-3)]",
@@ -578,6 +596,23 @@ export default function ActivityTimeline({
   ].join(" ")
   const itemDeleteClasses = [
     "text-[color:var(--color-text-muted)]",
+  ].join(" ")
+  const replyActionClasses = [
+    "bg-transparent",
+    "border-0",
+    "p-0",
+    "text-[length:var(--text-meta)]",
+    "leading-[var(--leading-normal)]",
+    "[font-weight:var(--font-weight-medium)]",
+    "text-[var(--color-text-brand)]",
+    "no-underline",
+    "underline-offset-2",
+    "transition-[color,text-decoration-color]",
+    "hover:text-[var(--color-action-brand-hover)]",
+    "hover:underline",
+    "focus-visible:outline-2",
+    "focus-visible:outline-offset-2",
+    "focus-visible:outline-[var(--color-focus-ring)]",
   ].join(" ")
   const inlineReplyClasses = [
     "mt-[var(--space-3)]",
@@ -1009,7 +1044,7 @@ ${ownerSignOffName}`
         )}
       </section>
 
-      <div className={scrollListOnly ? scrollRegionClasses : groupsClasses}>
+      <div className={scrollListOnly ? scrollRegionClasses : timelineGroupsRegionClasses}>
         {timelineItems.length === 0 ? (
           <p className={emptyStateClasses}>{emptyMessage}</p>
         ) : (
@@ -1231,7 +1266,7 @@ ${ownerSignOffName}`
                               {showReplyAction ? (
                                 <button
                                   type="button"
-                                  className={actionButtonClasses}
+                                  className={replyActionClasses}
                                   onClick={() => handleOpenReplyComposer(item.id)}
                                 >
                                   Reply

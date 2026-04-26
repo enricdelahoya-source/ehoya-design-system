@@ -41,3 +41,41 @@
   letter-spacing: normal;
   color: var(--color-text-section-title);
 }
+
+@utility internal-scroll {
+  scrollbar-width: thin;
+  scrollbar-color:
+    color-mix(in srgb, var(--color-border-strong) 42%, transparent)
+    transparent;
+}
+
+.internal-scroll::-webkit-scrollbar,
+.overflow-y-auto::-webkit-scrollbar {
+  width: var(--space-2);
+  height: var(--space-2);
+}
+
+.internal-scroll::-webkit-scrollbar-track,
+.overflow-y-auto::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.internal-scroll::-webkit-scrollbar-thumb,
+.overflow-y-auto::-webkit-scrollbar-thumb {
+  background-color: color-mix(in srgb, var(--color-border-strong) 34%, transparent);
+  border: var(--space-half) solid transparent;
+  border-radius: var(--radius-full);
+  background-clip: content-box;
+}
+
+.internal-scroll:hover::-webkit-scrollbar-thumb,
+.overflow-y-auto:hover::-webkit-scrollbar-thumb {
+  background-color: color-mix(in srgb, var(--color-border-strong) 46%, transparent);
+}
+
+.overflow-y-auto {
+  scrollbar-width: thin;
+  scrollbar-color:
+    color-mix(in srgb, var(--color-border-strong) 42%, transparent)
+    transparent;
+}
