@@ -398,8 +398,7 @@ export default function ActivityTimeline({
 
   const rootClasses = [
     "w-full",
-    "h-auto",
-    scrollListOnly ? "flex min-h-0 flex-col" : "",
+    scrollListOnly ? "flex flex-col" : "",
     className,
   ].filter(Boolean).join(" ")
   const composerClasses = [
@@ -420,9 +419,6 @@ export default function ActivityTimeline({
   ].join(" ")
   const groupsClasses = ["space-y-[var(--space-stack-md)]"].join(" ")
   const scrollRegionClasses = [
-    "min-h-0",
-    "flex-1",
-    "overflow-y-auto",
     "pt-[var(--space-stack-md)]",
     "pb-[var(--space-3)]",
   ].join(" ")

@@ -62,6 +62,17 @@ export default function CaseIntelligenceRail({
       ? "Generated from visible case details and recent activity."
       : "Reference cases with aligned ownership, pacing, and next-step patterns."
   const drawerMetadata = activeModule === "decision" ? updatedLabel : undefined
+  const similarCasesScrollBoundaryClasses = [
+    "min-h-0",
+    "[&>section]:h-auto",
+    "[&>section]:min-h-0",
+    "[&>section>div:first-child]:border-b",
+    "[&>section>div:first-child]:border-[var(--color-border-divider)]",
+    "[&>section>div:first-child]:pb-[var(--space-4)]",
+    "[&>section>div:last-child]:flex-none",
+    "[&>section>div:last-child]:overflow-visible",
+    "[&>section>div:last-child]:overscroll-auto",
+  ].join(" ")
   const drawerActions =
     activeModule === "decision" ? (
       <Link
@@ -102,7 +113,9 @@ export default function CaseIntelligenceRail({
           otherActionLabels={otherActionLabels}
         />
       ) : (
-        <SimilarCasesModule record={record} />
+        <div className={similarCasesScrollBoundaryClasses}>
+          <SimilarCasesModule record={record} />
+        </div>
       )}
     </Drawer>
   )

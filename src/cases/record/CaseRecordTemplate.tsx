@@ -88,23 +88,6 @@ const REASSIGNMENT_OPTIONS = {
 
 const REASSIGNMENT_TEAM_OPTIONS = Object.keys(REASSIGNMENT_OPTIONS)
 
-// Temporary scroll-debug instrumentation. Remove after identifying the real clipping container.
-const CASE_RECORD_SCROLL_DEBUG = true
-const CASE_RECORD_SCROLL_DEBUG_TIMELINE_ROOT_CLASS =
-  "case-record-scroll-debug-timeline-root"
-const CASE_RECORD_SCROLL_DEBUG_CLASSES = {
-  tabPanelOuter:
-    "outline outline-1 outline-offset-[-1px] outline-[rgba(37,99,235,0.55)] bg-[rgba(37,99,235,0.04)]",
-  tabPanelScroll:
-    "outline outline-1 outline-offset-[-1px] outline-[rgba(245,158,11,0.55)] bg-[rgba(245,158,11,0.04)]",
-  detailsContent:
-    "outline outline-1 outline-offset-[-1px] outline-[rgba(34,197,94,0.55)] bg-[rgba(34,197,94,0.04)]",
-  activityWrapper:
-    "outline outline-1 outline-offset-[-1px] outline-[rgba(168,85,247,0.55)] bg-[rgba(168,85,247,0.04)]",
-  activityTimelineRoot:
-    "outline outline-1 outline-offset-[-1px] outline-[rgba(239,68,68,0.55)] bg-[rgba(239,68,68,0.04)]",
-} as const
-
 const PROVIDE_ETA_SUMMARY =
   "Customer is asking for ETA on remittance correction before planning call"
 const PROVIDE_ETA_SUPPORTING_TEXT =
@@ -208,30 +191,6 @@ function sortOtherActionLabels(
   })
 }
 
-function getScrollDebugMetrics(label: string, element: HTMLDivElement | null) {
-  if (!element) {
-    return null
-  }
-
-  const computedStyle = window.getComputedStyle(element)
-  const rect = element.getBoundingClientRect()
-
-  return {
-    label,
-    clientHeight: element.clientHeight,
-    scrollHeight: element.scrollHeight,
-    offsetHeight: element.offsetHeight,
-    rectHeight: Math.round(rect.height * 100) / 100,
-    scrollTop: Math.round(element.scrollTop * 100) / 100,
-    overflowY: computedStyle.overflowY,
-    canScroll: element.scrollHeight > element.clientHeight + 1,
-  }
-}
-
-type ScrollDebugMetric = NonNullable<
-  ReturnType<typeof getScrollDebugMetrics>
->
-
 export default function CaseRecordTemplate({
   record,
   status,
@@ -266,18 +225,12 @@ export default function CaseRecordTemplate({
   const [isProvideEtaOpen, setIsProvideEtaOpen] = useState(false)
   const [provideEtaDraft, setProvideEtaDraft] = useState(DEFAULT_PROVIDE_ETA_REPLY)
   const [hasSentProvideEta, setHasSentProvideEta] = useState(false)
-  const [scrollDebugMetrics, setScrollDebugMetrics] = useState<ScrollDebugMetric[]>([])
-  const [activeScrollDebugOwners, setActiveScrollDebugOwners] = useState<string[]>([])
   const [reassignmentAssignee, setReassignmentAssignee] = useState("")
   const [reassignmentTeam, setReassignmentTeam] = useState("")
   const [reassignmentNote, setReassignmentNote] = useState("")
   const [escalationReason, setEscalationReason] = useState("")
   const [escalationNote, setEscalationNote] = useState("")
   const moreActionsRef = useRef<HTMLDivElement | null>(null)
-  const tabPanelOuterRef = useRef<HTMLDivElement | null>(null)
-  const tabPanelScrollRef = useRef<HTMLDivElement | null>(null)
-  const detailsContentRef = useRef<HTMLDivElement | null>(null)
-  const activityWrapperRef = useRef<HTMLDivElement | null>(null)
   const provideEtaFlowEnabled = shouldUseProvideEtaFlow(record) || hasSentProvideEta
   const caseActionState = resolveCaseState(record)
   const mockSignalRecord = record as CaseRecord & { followUpsSent?: number }
@@ -553,90 +506,6 @@ export default function CaseRecordTemplate({
       setEscalationNote("")
     }
   }, [canEscalateCase])
-
-  useEffect(() => {
-    if (!CASE_RECORD_SCROLL_DEBUG) {
-      return
-    }
-
-    let frameId = 0
-    let nestedFrameId = 0
-    let cleanupScrollListeners = () => {}
-
-    function measureScrollDebugMetrics() {
-      const activityTimelineRoot =
-        tabPanelScrollRef.current?.querySelector<HTMLDivElement>(
-          `.${CASE_RECORD_SCROLL_DEBUG_TIMELINE_ROOT_CLASS}`,
-        ) ?? null
-      const metrics = [
-        getScrollDebugMetrics("tab-panel-outer", tabPanelOuterRef.current),
-        getScrollDebugMetrics("tab-panel-scroll", tabPanelScrollRef.current),
-        getScrollDebugMetrics("details-content", detailsContentRef.current),
-        getScrollDebugMetrics("activity-wrapper", activityWrapperRef.current),
-        getScrollDebugMetrics("activity-timeline-root", activityTimelineRoot),
-      ].filter((entry): entry is ScrollDebugMetric => entry !== null)
-      const activeVerticalScrollOwners = metrics
-        .filter((entry) =>
-          (entry.overflowY === "auto" || entry.overflowY === "scroll") &&
-          entry.canScroll,
-        )
-        .map((entry) => entry.label)
-
-      setScrollDebugMetrics(metrics)
-      setActiveScrollDebugOwners(activeVerticalScrollOwners)
-
-      console.groupCollapsed(
-        `[case-record-scroll-debug] ${record.id} · ${recordTab}`,
-      )
-      console.table(metrics)
-      console.log("Active vertical scroll owners:", activeVerticalScrollOwners)
-      console.groupEnd()
-
-      const scrollTargets = [
-        tabPanelOuterRef.current,
-        tabPanelScrollRef.current,
-        detailsContentRef.current,
-        activityWrapperRef.current,
-        activityTimelineRoot,
-      ].filter((element): element is HTMLDivElement => element !== null)
-
-      cleanupScrollListeners()
-
-      const handleScroll = () => {
-        measureScrollDebugMetrics()
-      }
-
-      scrollTargets.forEach((element) => {
-        element.addEventListener("scroll", handleScroll, { passive: true })
-      })
-
-      cleanupScrollListeners = () => {
-        scrollTargets.forEach((element) => {
-          element.removeEventListener("scroll", handleScroll)
-        })
-      }
-    }
-
-    frameId = window.requestAnimationFrame(() => {
-      nestedFrameId = window.requestAnimationFrame(() => {
-        measureScrollDebugMetrics()
-      })
-    })
-
-    return () => {
-      cleanupScrollListeners()
-      window.cancelAnimationFrame(frameId)
-      window.cancelAnimationFrame(nestedFrameId)
-    }
-  }, [
-    record.id,
-    recordTab,
-    isReassignOpen,
-    isEscalateOpen,
-    isProvideEtaOpen,
-    sections.length,
-    selectedActivityTimelineItems.length,
-  ])
 
   const trimmedReassignmentAssignee = reassignmentAssignee.trim()
   const trimmedReassignmentTeam = reassignmentTeam.trim()
@@ -1050,37 +919,19 @@ export default function CaseRecordTemplate({
             />
           </div>
 
-          <div
-            ref={tabPanelOuterRef}
-            className={[
-              "min-h-0 flex-1 overflow-hidden pt-[var(--space-3)]",
-              CASE_RECORD_SCROLL_DEBUG ? CASE_RECORD_SCROLL_DEBUG_CLASSES.tabPanelOuter : "",
-            ]
-              .filter(Boolean)
-              .join(" ")}
-          >
+          <div className="min-h-0 flex-1 overflow-hidden pt-[var(--space-3)]">
             <div
-              ref={tabPanelScrollRef}
               className={[
                 "min-h-0 h-full min-w-0 w-full",
                 recordTab === "details"
                   ? "overflow-y-auto overscroll-contain"
                   : "overflow-hidden",
-                CASE_RECORD_SCROLL_DEBUG ? CASE_RECORD_SCROLL_DEBUG_CLASSES.tabPanelScroll : "",
               ]
                 .filter(Boolean)
                 .join(" ")}
             >
               {recordTab === "details" ? (
-                <div
-                  ref={detailsContentRef}
-                  className={[
-                    "min-w-0 w-full space-y-[var(--space-6)]",
-                    CASE_RECORD_SCROLL_DEBUG ? CASE_RECORD_SCROLL_DEBUG_CLASSES.detailsContent : "",
-                  ]
-                    .filter(Boolean)
-                    .join(" ")}
-                >
+                <div className="min-w-0 w-full space-y-[var(--space-6)]">
                   {sections.map((section) =>
                     renderCaseRecordSection({
                       section,
@@ -1092,22 +943,9 @@ export default function CaseRecordTemplate({
                   )}
                 </div>
               ) : (
-                <div
-                  ref={activityWrapperRef}
-                  className={[
-                    "min-h-0 h-full min-w-0 w-full overflow-y-auto overscroll-contain",
-                    CASE_RECORD_SCROLL_DEBUG ? CASE_RECORD_SCROLL_DEBUG_CLASSES.activityWrapper : "",
-                  ]
-                    .filter(Boolean)
-                    .join(" ")}
-                >
+                <div className="min-h-0 h-full min-w-0 w-full overflow-y-auto overscroll-contain">
                   <ActivityTimeline
                     items={selectedActivityTimelineItems}
-                    className={
-                      CASE_RECORD_SCROLL_DEBUG
-                        ? `${CASE_RECORD_SCROLL_DEBUG_TIMELINE_ROOT_CLASS} ${CASE_RECORD_SCROLL_DEBUG_CLASSES.activityTimelineRoot}`
-                        : undefined
-                    }
                     highlightedItemId={highlightedTimelineItemId}
                     activeSuggestedAction={provideEtaFlowEnabled ? null : activeSuggestedAction}
                     replyDraftContext={{
@@ -1127,64 +965,6 @@ export default function CaseRecordTemplate({
               )}
             </div>
           </div>
-          {CASE_RECORD_SCROLL_DEBUG ? (
-            <aside
-              aria-label="Case record scroll debug"
-              className="pointer-events-auto absolute top-[var(--space-4)] right-[var(--space-4)] z-20 max-h-[calc(100%-var(--space-8))] w-[min(20rem,calc(100%-var(--space-6)))] overflow-y-auto rounded-[var(--radius-sm)] border border-[var(--color-border-divider)] bg-[var(--color-surface-elevated)] p-[var(--space-3)]"
-            >
-              <div className="space-y-[var(--space-2)]">
-                <div className="space-y-[var(--space-half)]">
-                  <p className="text-[length:var(--text-xs)] leading-[var(--leading-normal)] font-medium text-[color:var(--color-text-primary)]">
-                    Scroll debug
-                  </p>
-                  <p className="text-[length:var(--text-xs)] leading-[var(--leading-normal)] text-[color:var(--color-text-muted)]">
-                    Active scroll owners: {activeScrollDebugOwners.join(", ") || "none"}
-                  </p>
-                </div>
-
-                {scrollDebugMetrics.map((metric) => {
-                  const isActiveOwner = activeScrollDebugOwners.includes(metric.label)
-
-                  return (
-                    <div
-                      key={metric.label}
-                      className={[
-                        "space-y-[var(--space-1)] rounded-[var(--radius-sm)] border px-[var(--space-2)] py-[var(--space-2)]",
-                        isActiveOwner
-                          ? "border-[var(--color-border-divider)] bg-[var(--color-surface-muted)]"
-                          : "border-[var(--color-border-divider)] bg-[var(--color-surface)]",
-                      ]
-                        .filter(Boolean)
-                        .join(" ")}
-                    >
-                      <div className="flex items-center justify-between gap-[var(--space-2)]">
-                        <p className="text-[length:var(--text-xs)] leading-[var(--leading-normal)] font-medium text-[color:var(--color-text-primary)]">
-                          {metric.label}
-                        </p>
-                        {isActiveOwner ? (
-                          <span className="text-[length:var(--text-xs)] leading-[var(--leading-normal)] text-[color:var(--color-text-primary)]">
-                            scroll owner
-                          </span>
-                        ) : null}
-                      </div>
-                      <dl className="grid grid-cols-[auto_1fr] gap-x-[var(--space-2)] gap-y-[var(--space-half)] text-[length:var(--text-xs)] leading-[var(--leading-normal)] text-[color:var(--color-text-secondary)]">
-                        <dt>clientHeight</dt>
-                        <dd className="m-0">{metric.clientHeight}</dd>
-                        <dt>scrollHeight</dt>
-                        <dd className="m-0">{metric.scrollHeight}</dd>
-                        <dt>overflowY</dt>
-                        <dd className="m-0">{metric.overflowY}</dd>
-                        <dt>canScroll</dt>
-                        <dd className="m-0">{String(metric.canScroll)}</dd>
-                        <dt>scrollTop</dt>
-                        <dd className="m-0">{metric.scrollTop}</dd>
-                      </dl>
-                    </div>
-                  )
-                })}
-              </div>
-            </aside>
-          ) : null}
         </div>
       }
       aiRegion={
