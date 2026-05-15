@@ -1,122 +1,269 @@
 # ERP Design System Lab
 
-Exploration of a token-driven design system built with React and Tailwind v4, focused on complex, enterprise-style products.
+Exploration of an AI-assisted operational system for complex enterprise workflows.
 
-This project is not a UI showcase.  
-It’s a system-first approach to defining structure, interaction, and scalability.
+Built with React, TypeScript, and Tailwind v4, the project explores how structured workflows, schema-driven UI, semantic tokens, and AI-assisted decision support can work together inside complex operational software.
+
+The goal is not to build a component library.
+
+The goal is to explore how enterprise software can become more structured, scalable, and AI-compatible.
 
 ---
 
-## Context
+## Problem
 
-Enterprise tools (ERP, case management, admin systems) are:
+Enterprise systems often break down in predictable ways:
 
-- dense
-- constraint-heavy
-- interaction-driven
-- often inconsistent over time
+- ownership becomes unclear
+- workflows drift over time
+- timelines become hard to parse
+- next steps stay implicit
+- backend structure leaks into UX
+- AI gets layered on top of inconsistent workflows
 
-This project explores how to bring:
+This project explores the opposite approach:
 
-- clarity
-- consistency
-- and extensibility
+- structure first
+- AI second
 
-through a code-driven design system.
+The idea is that AI becomes significantly more useful when workflows, states, ownership, and operational context are explicit.
+
+The project is based on the idea that enterprise software quality is largely determined by how clearly systems expose state, ownership, and next actions.
 
 ---
 
 ## Principles
 
 - **Structure over decoration**  
-  Visual decisions should reinforce hierarchy and usability, not aesthetics alone.
+  Visual decisions should reinforce hierarchy, state, and usability.
 
 - **Semantic tokens**  
-  No raw values. Everything maps to meaning (surface, text, action, feedback).
+  No raw values. Everything maps to meaning:
+  surface, text, action, feedback, emphasis.
+
+- **Explicit operational state**  
+  Workflows should expose ownership, urgency, blockers, and next steps clearly.
 
 - **Interaction clarity**  
-  Hover, focus, and states are part of the system, not afterthoughts.
+  Hover, focus, transitions, and feedback are part of the system itself.
 
 - **Scalable primitives**  
-  Components encode behavior, not just appearance.
+  Components encode structure and behavior, not only appearance.
 
-- **Pragmatism over purity**  
-  System decisions are balanced with implementation constraints.
+- **AI grounded in context**  
+  AI should operate on structured operational data, not detached prompts.
+
+- **Consistency as governance**  
+  The system should make inconsistent patterns harder to introduce over time.
+
+---
+
+## System Architecture
+
+### Design system foundation
+
+- semantic token architecture
+- shared primitives
+- schema-driven fields
+- reusable layouts and templates
+- standardized interaction states
+
+### Workflow model
+
+- explicit ownership and state
+- operational signals and prioritization
+- timeline-driven records
+- collection → record triage flow
+- structured next-step modeling
+
+### AI-assisted decision support
+
+- case summarization
+- workflow-aware recommendations
+- grounded references
+- traceable next-step suggestions
+- operational decision support
 
 ---
 
 ## Stack
 
-- React + Vite
+- React
 - TypeScript
+- Vite
 - Tailwind v4 (`@theme`)
-- CSS variables for tokens
+- CSS variables
+- Schema-driven rendering patterns
 
 ---
 
-## Current Scope
+## Current Capabilities
 
-### Tokens
+### Design system
 
-- Color system
-  - surfaces, text, actions, feedback
-- Spacing (rem-based scale)
-- Semantic spacing (inline, stack, section)
-- Radius, shadows
-- Control heights and typography
+- semantic token system
+- spacing and layout scales
+- control sizing
+- typography primitives
+- interaction states
 
 ### Components
 
 - Button
-  - variants: primary, secondary, ghost
-  - sizes: sm, md
-  - states: hover, active, focus, disabled
+- Input
+- Field wrapper
+- StatusBadge
+- Drawer
+- Tabs
+- Timeline patterns
 
-### Interaction model
+### Workflow surfaces
 
-- Primary → surface-driven (filled)
-- Secondary → structure-driven (border)
-- Ghost → text-driven (minimal)
+- case list triage
+- record templates
+- operational state modeling
+- activity timelines
+- ownership and escalation flows
 
-Hover and active states are aligned across variants to reduce noise and improve consistency.
+### AI-assisted interactions
+
+- case summaries
+- suggested next actions
+- grounded reasoning references
+- workflow-aware support patterns
 
 ---
 
-## Playground
+## Repository Structure
 
-A small UI is used to validate:
+~~~txt
+src/
+  cases/
+    list/
+    record/
 
-- hierarchy
-- spacing
-- states
-- token behavior
+  design-system/
+    components/
+    templates/
+    tokens/
 
-This acts as a testing surface rather than a final product.
+  prototype/
+
+playbook/
+tests/
+worklog/
+public/
+~~~
+
+### Structure overview
+
+#### `cases/`
+
+Contains the operational product layer.
+
+This includes:
+- collection/list workflows
+- record views
+- triage patterns
+- operational state modeling
+- timeline-driven interactions
+- AI-assisted workflow exploration
+
+#### `design-system/`
+
+Core system foundation.
+
+Includes:
+- semantic tokens
+- reusable primitives
+- layout templates
+- interaction patterns
+- scalable UI structure
+
+#### `prototype/`
+
+Experimental surfaces used to validate workflows, interaction patterns, and AI-assisted operational behaviors under realistic scenarios.
+
+It acts as both:
+- a design system testing surface
+- and a lightweight operational simulation environment
+
+#### `playbook/`
+
+Internal system guidance and implementation patterns.
+
+Used to document:
+- system principles
+- prompting structure
+- implementation constraints
+- governance patterns
+- execution/debugging workflows
+
+#### `tests/`
+
+Validation and testing surfaces for system behavior and workflow consistency.
+
+#### `worklog/`
+
+Iterative development notes, architectural decisions, and ongoing exploration tracking.
+
+---
+
+## Governance and prompting
+
+The repository includes internal system contracts and prompting structures used to reduce implementation drift and maintain consistency.
+
+Key concepts include:
+
+- constrained execution modes
+- scoped implementation patterns
+- system contracts
+- debugging workflows
+- minimal-surface changes
+
+The goal is to treat system behavior and AI behavior with the same level of structural rigor.
+
+---
+
+## AI Evaluation Direction
+
+The AI-assisted layer is being developed with an evaluation-first approach.
+
+Focus areas include:
+
+- structured datasets
+- prompt iteration
+- grounded recommendations
+- visible reasoning context
+- workflow-aware evaluation
+- operational reliability
+
+The goal is to avoid generic AI interactions and instead build systems that support real operational decision-making.
 
 ---
 
 ## Next Steps
 
-- Input component (labels, errors, focus states)
-- Form patterns
-- Table / list patterns
-- Case management application (real use case)
-- AI layer:
-  - case summarization
-  - timeline structuring
-  - next-step suggestions
-  - grounded recommendations
+- richer workflow scenarios
+- escalation and reassignment logic
+- realistic multi-actor datasets
+- AI evaluation pipeline
+- workflow simulation
+- improved grounding and traceability
+- larger schema-driven surfaces
+- operational analytics patterns
 
 ---
 
 ## Goal
 
-To build a system that:
+The goal is to explore what enterprise software could look like if:
 
-- handles complexity (not just simple UI)
-- bridges design and engineering
-- supports real workflows
-- integrates AI in a controlled, explainable way
+- workflows were structurally explicit
+- UI systems encoded operational behavior
+- AI operated on grounded context instead of loose prompts
+- decision support became part of the interface itself
+- consistency scaled through system constraints rather than manual enforcement
 
 ---
 
@@ -125,86 +272,9 @@ To build a system that:
 This is an evolving system.
 
 Decisions are intentionally iterative:
-- define → test → adjust → scale
 
-The focus is not visual polish, but system clarity.
+define → test → evaluate → adjust → scale
 
+The focus is not visual novelty.
 
-
-
-
-
-
-# React + TypeScript + Vite
-
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
-
-Currently, two official plugins are available:
-
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
-
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+The focus is operational clarity, structural consistency, and AI-compatible workflows.
